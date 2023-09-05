@@ -37,7 +37,7 @@ class App {
         scene.enablePhysics(gravityVector, physicsPlugin)
 
         let camera: ArcRotateCamera = new ArcRotateCamera("Camera", Math.PI / 2, Math.PI * 3 / 8, 15, Vector3.Zero(), scene)
-        camera.upperRadiusLimit = 40
+        camera.upperRadiusLimit = 35
         camera.lowerRadiusLimit = 3
         camera.panningSensibility = 0
         camera.wheelDeltaPercentage = 0.01
