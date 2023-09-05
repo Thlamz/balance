@@ -2,5 +2,5 @@ export default {
     optimizeDeps: {
         exclude: ['@babylonjs/havok'],
     },
-    base: ''
+    base: '/balance'
 }
