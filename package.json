@@ -16,7 +16,6 @@
   "dependencies": {
     "earcut": "^2.2.4",
     "@babylonjs/core": "^6.19.1",
-    "@babylonjs/havok": "^1.1.4",
-    "@babylonjs/inspector": "^6.19.1"
+    "@babylonjs/havok": "^1.1.4"
   }
 }
