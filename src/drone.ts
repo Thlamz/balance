@@ -10,6 +10,7 @@ import {
     Vector3
 } from "@babylonjs/core"
 import * as earcut from "earcut"
+import streak from "textures/streak.png"
 
 
 export default class DroneEntity {
@@ -171,7 +172,7 @@ export default class DroneEntity {
         const prop1Emitter = new SphereDirectedParticleEmitter(0.12, new Vector3(0, 0, -1), new Vector3(0, 0, -1))
         propParticles.emitter = emitter
         propParticles.particleEmitterType = prop1Emitter
-        propParticles.particleTexture = new Texture("/textures/streak.png")
+        propParticles.particleTexture = new Texture(streak)
         propParticles.translationPivot = new Vector2(0, -0.1)
         propParticles.minSize = 0.02
         propParticles.maxSize = 0.03
