@@ -9,6 +9,7 @@ import {
 } from "@babylonjs/core"
 import DroneEntity from "./drone"
 import HavokPhysics from "@babylonjs/havok"
+import "./style.css"
 
 const physicsEngine = await HavokPhysics()
 
@@ -23,6 +24,11 @@ class App {
 
         // initialize babylon scene and engine
         let engine = new Engine(canvas, true)
+
+        window.addEventListener("resize", () => {
+            engine.resize()
+        })
+
         let scene = new Scene(engine)
 
         const gravityVector = new Vector3(0, -9.81, 0)
