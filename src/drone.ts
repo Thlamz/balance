@@ -10,7 +10,7 @@ import {
     Vector3
 } from "@babylonjs/core"
 import * as earcut from "earcut"
-import streak from "textures/streak.png"
+import streak from "./textures/streak.png"
 
 
 export default class DroneEntity {
