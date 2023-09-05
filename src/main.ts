@@ -44,10 +44,10 @@ class App {
         camera.useAutoRotationBehavior = true
         camera.attachControl(canvas, true)
 
-        let light = new HemisphericLight("light", new Vector3(0, 1, 0), scene)
+        new HemisphericLight("light", new Vector3(0, 1, 0), scene)
 
 
-        let drone = new DroneEntity("drone1", scene)
+        let drone = new DroneEntity(scene)
 
         // hide/show the Inspector
         window.addEventListener("keydown", (ev) => {

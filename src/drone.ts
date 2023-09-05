@@ -22,7 +22,7 @@ export default class DroneEntity {
     private readonly scene: Scene
     private readonly physics: PhysicsAggregate
 
-    constructor(name: string, scene: Scene) {
+    constructor(scene: Scene) {
         this.scene = scene
 
         let structure1 = MeshBuilder.CreateCylinder("structure1", {
