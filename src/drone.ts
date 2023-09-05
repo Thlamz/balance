@@ -82,7 +82,7 @@ export default class DroneEntity {
         const blade1 = MeshBuilder.ExtrudePolygon("blade1", {
             shape: propShape,
             depth: 0.25,
-        }, scene, earcut)
+        }, scene, earcut.default)
         blade1.position.y = 0.25 / 2
         const blade2 = blade1.clone("blade2")
 
