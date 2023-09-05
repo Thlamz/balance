@@ -1,16 +1,23 @@
-import {
-    Animatable,
-    Animation,
-    Color3, Color4, GPUParticleSystem,
-    Mesh,
-    MeshBuilder, ParticleSystem,
-    PBRMetallicRoughnessMaterial, PhysicsAggregate, PhysicsShapeType, Plane,
-    Scene, SphereDirectedParticleEmitter,
-    StandardMaterial, Texture, Vector2,
-    Vector3
-} from "@babylonjs/core"
 import * as earcut from "earcut"
 import streak from "./textures/streak.png"
+import {StandardMaterial} from "@babylonjs/core/Materials/standardMaterial"
+import {Texture} from "@babylonjs/core/Materials/Textures/texture"
+import {PBRMetallicRoughnessMaterial} from "@babylonjs/core/Materials/PBR/pbrMetallicRoughnessMaterial"
+import {PhysicsAggregate} from "@babylonjs/core/Physics/v2/physicsAggregate"
+import {PhysicsShapeType} from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin"
+import {Vector2, Vector3} from "@babylonjs/core/Maths/math.vector"
+import {Color3, Color4} from "@babylonjs/core/Maths/math.color"
+import {Plane} from "@babylonjs/core/Maths/math.plane"
+import {GPUParticleSystem} from "@babylonjs/core/Particles/gpuParticleSystem"
+import {ParticleSystem} from "@babylonjs/core/Particles/particleSystem"
+import {SphereDirectedParticleEmitter} from "@babylonjs/core/Particles/EmitterTypes/sphereParticleEmitter"
+import {Mesh} from "@babylonjs/core/Meshes/mesh"
+import {Scene} from "@babylonjs/core/scene"
+import {Animation} from "@babylonjs/core/Animations/animation"
+import {Animatable} from "@babylonjs/core/Animations/animatable"
+import "@babylonjs/core/Physics/joinedPhysicsEngineComponent"
+import {ExtrudePolygon} from "@babylonjs/core/Meshes/Builders/polygonBuilder"
+import {CreateCylinder} from "@babylonjs/core/Meshes/Builders/cylinderBuilder"
 
 
 export default class DroneEntity {
@@ -26,7 +33,7 @@ export default class DroneEntity {
     constructor(scene: Scene) {
         this.scene = scene
 
-        let structure1 = MeshBuilder.CreateCylinder("structure1", {
+        let structure1 = CreateCylinder("structure1", {
             tessellation: 6,
             diameter: 0.06,
             height: 1
@@ -36,13 +43,13 @@ export default class DroneEntity {
         structure1.rotation.z = Math.PI / 4
         structure2.rotation.z = -Math.PI / 4
 
-        let centerStructure = MeshBuilder.CreateCylinder("center", {
+        let centerStructure = CreateCylinder("center", {
             diameter: 0.2,
             height: 0.1
         }, scene)
         centerStructure.rotation.x = Math.PI / 2
 
-        let edgeStructure1 = MeshBuilder.CreateCylinder("edge1", {
+        let edgeStructure1 = CreateCylinder("edge1", {
             diameter: 0.08,
             height: 0.15
         })
@@ -80,7 +87,7 @@ export default class DroneEntity {
             new Vector3(0.01, 0, -0.003),
         ]
 
-        const blade1 = MeshBuilder.ExtrudePolygon("blade1", {
+        const blade1 = ExtrudePolygon("blade1", {
             shape: propShape,
             depth: 0.25,
         }, scene, earcut.default)

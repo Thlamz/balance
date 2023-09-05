@@ -1,13 +1,17 @@
-import {
-    Engine,
-    Scene,
-    ArcRotateCamera,
-    Vector3,
-    HemisphericLight, Color3, MeshBuilder, Mesh, StandardMaterial, HavokPlugin
-} from "@babylonjs/core"
 import DroneEntity from "./drone"
 import HavokPhysics from "@babylonjs/havok"
 import "./style.css"
+import { Engine } from "@babylonjs/core/Engines/engine"
+import {HemisphericLight} from "@babylonjs/core/Lights/hemisphericLight";
+import {ArcRotateCamera} from "@babylonjs/core/Cameras/arcRotateCamera";
+import {HavokPlugin} from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
+import {StandardMaterial} from "@babylonjs/core/Materials/standardMaterial";
+import {Vector3} from "@babylonjs/core/Maths/math.vector";
+import {Color3} from "@babylonjs/core/Maths/math.color";
+import {Mesh} from "@babylonjs/core/Meshes/mesh";
+import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
+import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
+import {Scene} from "@babylonjs/core/scene";
 
 async function setupSimulation() {
     // create the canvas html element and attach it to the webpage
@@ -56,7 +60,7 @@ async function setupSimulation() {
         }
     })
 
-    let bounds = MeshBuilder.CreateSphere("bounds", {
+    let bounds = CreateSphere("bounds", {
         diameter: boundSize,
         sideOrientation: Mesh.BACKSIDE
     }, scene)
@@ -67,7 +71,7 @@ async function setupSimulation() {
 
     bounds.material = boundsMaterial
 
-    let skybox = MeshBuilder.CreateBox("skybox", {
+    let skybox = CreateBox("skybox", {
         size: 50,
         sideOrientation: Mesh.BACKSIDE
     })
