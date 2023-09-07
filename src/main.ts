@@ -12,6 +12,7 @@ import {Mesh} from "@babylonjs/core/Meshes/mesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 import {Scene} from "@babylonjs/core/scene";
+import Wind from "./wind";
 
 async function setupSimulation() {
     // create the canvas html element and attach it to the webpage
@@ -46,7 +47,8 @@ async function setupSimulation() {
 
     new HemisphericLight("light", new Vector3(0, 1, 0), scene)
 
-    let drone = new DroneEntity(scene)
+    const drone = new DroneEntity(scene)
+    new Wind(scene, [drone.physics]);
 
     const boundSize = 10
     // run the main render loop

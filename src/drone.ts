@@ -29,7 +29,7 @@ export default class DroneEntity {
     private propParticleEmitters: (ParticleSystem | GPUParticleSystem)[]
     private readonly reversedAnimations: number[]
     private readonly scene: Scene
-    private readonly physics: PhysicsAggregate
+    public readonly physics: PhysicsAggregate
 
     constructor(scene: Scene) {
         this.scene = scene
@@ -224,7 +224,7 @@ export default class DroneEntity {
             this.props[2].absolutePosition).normal
         for (let index = 0; index < this.propSpeeds.length; index++) {
             const speed = this.propSpeeds[index] * 10 / 4
-            const direction = angle.multiply(new Vector3(speed, speed, speed))
+            const direction = angle.scale(speed)
             this.physics.body.applyForce(direction, this.props[index].absolutePosition)
         }
     }
