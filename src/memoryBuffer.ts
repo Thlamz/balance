@@ -1,5 +1,4 @@
 import {StateArray} from "./state";
-import {ActionArray} from "./action";
 
 export type Memory = [StateArray, StateArray, number, number]
 

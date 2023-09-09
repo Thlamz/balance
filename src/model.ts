@@ -1,6 +1,5 @@
 import * as tf from "@tensorflow/tfjs";
 import {Sequential} from "@tensorflow/tfjs";
-import {StateArray} from "./state";
 
 type QValues = tf.Tensor
 
