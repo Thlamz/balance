@@ -58,12 +58,6 @@ async function setupSimulation() {
         scene.render()
     })
 
-    scene.onBeforePhysicsObservable.add(() => {
-        if(drone.mesh.absolutePosition.lengthSquared() > (boundSize/2) * (boundSize/2)) {
-            drone.reset()
-        }
-    })
-
     let bounds = CreateSphere("bounds", {
         diameter: boundSize,
         sideOrientation: Mesh.BACKSIDE
@@ -87,12 +81,22 @@ async function setupSimulation() {
 
     const orchestrator = new Orchestrator(drone, wind, {
         stepInterval: 100,
-        batch_size: 500,
-        memory_size: 100_000,
-        optimize: true,
-        training_steps: 10_000,
-        target_update_interval: 500
+        batchSize: 500,
+        memorySize: 100_000,
+        trainingSteps: 10_000,
+        targetUpdateInterval: 500,
+        gamma: 0.99,
+        hiddenLayerSize: 120,
+        numHiddenLayers: 2
     })
+
+    scene.onBeforePhysicsObservable.add(async () => {
+        if(drone.mesh.absolutePosition.lengthSquared() > (boundSize/2) * (boundSize/2)) {
+            orchestrator.failEpisode()
+            drone.reset()
+        }
+    })
+
     orchestrator.start()
 
 }

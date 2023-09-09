@@ -1,10 +1,12 @@
 import * as tf from "@tensorflow/tfjs";
 import {Sequential} from "@tensorflow/tfjs";
+import {STATE_SIZE} from "./state";
+import {ACTION_MAP} from "./action";
 
 type QValues = tf.Tensor
 
 export class Model {
-    private readonly network: Sequential
+    public network: Sequential
     constructor() {
         const network = tf.sequential();
         [60, 60].forEach((hiddenLayerSize, i) => {
@@ -12,10 +14,10 @@ export class Model {
                 units: hiddenLayerSize,
                 activation: 'relu',
                 // `inputShape` is required only for the first layer.
-                inputShape: i === 0 ? [4] : undefined
+                inputShape: i === 0 ? [STATE_SIZE] : undefined
             }));
         });
-        network.add(tf.layers.dense({units: 16}));
+        network.add(tf.layers.dense({units: ACTION_MAP.length}));
 
         network.summary();
         network.compile({optimizer: 'adam', loss: 'meanSquaredError'});
@@ -23,7 +25,7 @@ export class Model {
     }
 
     public predict(states: tf.Tensor): QValues {
-        return <QValues> tf.tidy(() => this.network.predict(states.reshape([-1, 4])))
+        return <QValues> tf.tidy(() => this.network.predict(states.reshape([-1, STATE_SIZE])))
     }
 
     public async optimize(xBatch: QValues, yBatch: QValues) {
@@ -36,5 +38,13 @@ export class Model {
 
     public getWeights(): tf.Tensor[] {
         return this.network.getWeights()
+    }
+
+    public async save() {
+        await this.network.save('downloads://trained-model');
+    }
+
+    public async load(path: string) {
+        this.network = <Sequential> await tf.loadLayersModel(path)
     }
 }

@@ -24,6 +24,12 @@ export class MemoryBuffer {
         }
     }
 
+    clear() {
+        this.currentIndex = 0
+        this.currentSize = 0
+        this.memory = new Array(this.maxSize)
+    }
+
     // https://stackoverflow.com/a/11935263
     getRandomSubarray(arr, size) {
         var shuffled = arr.slice(0), i = arr.length, temp, index;
