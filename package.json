@@ -14,8 +14,9 @@
     "vite": "^4.4.5"
   },
   "dependencies": {
-    "earcut": "^2.2.4",
     "@babylonjs/core": "^6.19.1",
-    "@babylonjs/havok": "^1.1.4"
+    "@babylonjs/havok": "^1.1.4",
+    "@tensorflow/tfjs": "^4.10.0",
+    "earcut": "^2.2.4"
   }
 }

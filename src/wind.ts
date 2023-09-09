@@ -15,6 +15,8 @@ export default class Wind {
     public readonly vane: Mesh
     public readonly bounds: Mesh
 
+    public speed: number
+
     constructor(scene: Scene, affectedEntities: PhysicsAggregate[]) {
         this.scene = scene
 
@@ -52,6 +54,7 @@ export default class Wind {
         this.vane = vane
 
         this.windDirection = 0;
+        this.speed = 3;
 
 
         const relativeCenter = new Vector3(0, -1.5, 5);
@@ -67,7 +70,7 @@ export default class Wind {
 
 
         scene.onBeforePhysicsObservable.add(() => {
-            const force = new Vector3(Math.sin(this.windDirection), 0, Math.cos(this.windDirection)).normalize().scale(3);
+            const force = new Vector3(Math.sin(this.windDirection), 0, Math.cos(this.windDirection)).normalize().scale(this.speed);
             affectedEntities.forEach(e => e.body.applyForce(
                 force,
                 e.transformNode.absolutePosition

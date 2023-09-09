@@ -234,6 +234,7 @@ export default class DroneEntity {
         this.physics.body.setAngularVelocity(Vector3.Zero())
         this.physics.body.setLinearVelocity(Vector3.Zero())
         this.physics.transformNode.setAbsolutePosition(Vector3.Zero())
+        this.physics.transformNode.rotation = new Vector3(-Math.PI/2, 0, 0)
         this.setPropSpeed(1)
         this.scene.onAfterRenderObservable.addOnce(() => {
             this.physics.body.disablePreStep = true

@@ -13,6 +13,7 @@ import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 import {Scene} from "@babylonjs/core/scene";
 import Wind from "./wind";
+import {Orchestrator} from "./orchestrator";
 
 async function setupSimulation() {
     // create the canvas html element and attach it to the webpage
@@ -48,7 +49,8 @@ async function setupSimulation() {
     new HemisphericLight("light", new Vector3(0, 1, 0), scene)
 
     const drone = new DroneEntity(scene)
-    new Wind(scene, [drone.physics]);
+    const wind = new Wind(scene, [drone.physics]);
+    wind.speed = 0
 
     const boundSize = 10
     // run the main render loop
@@ -82,6 +84,17 @@ async function setupSimulation() {
     skyboxMaterial.disableLighting = true
 
     skybox.material = skyboxMaterial
+
+    const orchestrator = new Orchestrator(drone, wind, {
+        stepInterval: 100,
+        batch_size: 500,
+        memory_size: 100_000,
+        optimize: true,
+        training_steps: 10_000,
+        target_update_interval: 500
+    })
+    orchestrator.start()
+
 }
 
 setupSimulation()
