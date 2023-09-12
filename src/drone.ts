@@ -19,6 +19,7 @@ import {Animatable} from "@babylonjs/core/Animations/animatable"
 import "@babylonjs/core/Physics/joinedPhysicsEngineComponent"
 import {ExtrudePolygon} from "@babylonjs/core/Meshes/Builders/polygonBuilder"
 import {CreateCylinder} from "@babylonjs/core/Meshes/Builders/cylinderBuilder"
+import {IAnimationKey} from "@babylonjs/core";
 
 
 export default class DroneEntity {
@@ -102,7 +103,7 @@ export default class DroneEntity {
         blackMaterial.disableLighting = true
         blackMaterial.diffuseColor = new Color3(0.15, 0.15, 0.15)
 
-        const animationKeys = []
+        const animationKeys: IAnimationKey[] = []
         animationKeys.push({
             frame: 0,
             value: 0
@@ -229,11 +230,11 @@ export default class DroneEntity {
         }
     }
 
-    reset() {
+    reset(position: Vector3) {
         this.physics.body.disablePreStep = false
         this.physics.body.setAngularVelocity(Vector3.Zero())
         this.physics.body.setLinearVelocity(Vector3.Zero())
-        this.physics.transformNode.setAbsolutePosition(Vector3.Zero())
+        this.physics.transformNode.setAbsolutePosition(position)
         this.physics.transformNode.rotation = new Vector3(-Math.PI/2, 0, 0)
         this.setPropSpeed(1)
         this.scene.onAfterRenderObservable.addOnce(() => {

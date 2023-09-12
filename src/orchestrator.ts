@@ -5,8 +5,8 @@ import * as tf from "@tensorflow/tfjs"
 import {Memory, MemoryBuffer} from "./memoryBuffer";
 import {Model} from "./model";
 import {ACTION_MAP, applyAction} from "./action";
-import trained from "../public/trained/trained_model.json"
-import {nextFrame} from "@tensorflow/tfjs";
+import {Scene} from "@babylonjs/core/scene";
+import {Vector3} from "@babylonjs/core/Maths/math.vector";
 
 interface Configuration {
     stepInterval: number,
@@ -16,12 +16,14 @@ interface Configuration {
     targetUpdateInterval: number
     gamma: number
     hiddenLayerSize: number
-    numHiddenLayers: number
+    numHiddenLayers: number,
+    boundSize: number
 }
 
 
 
 export class Orchestrator {
+    scene: Scene
     drone: DroneEntity
     wind: Wind
     currentState: StateArray | null
@@ -39,7 +41,8 @@ export class Orchestrator {
     target: Model
 
     trainingStep: number
-    constructor(drone: DroneEntity, wind: Wind, config: Configuration, train = true) {
+    constructor(scene: Scene, drone: DroneEntity, wind: Wind, config: Configuration, train = true) {
+        this.scene = scene
         this.drone = drone
         this.wind = wind
         this.config = config
@@ -54,6 +57,13 @@ export class Orchestrator {
         this.epsilon = 0
 
         this.shouldTrain = train
+
+
+        scene.onBeforePhysicsObservable.add(async () => {
+            if(drone.mesh.absolutePosition.lengthSquared() > (config.boundSize/2) * (config.boundSize/2)) {
+                this.failEpisode()
+            }
+        })
     }
 
     _optimize: boolean
@@ -110,7 +120,7 @@ export class Orchestrator {
     }
 
     private async optimize (nextState: StateArray) {
-        this.epsilon = 1 - this.trainingStep / this.config.trainingSteps
+        this.epsilon = Math.exp(-1. * this.trainingStep / 1000)
 
         if(!this.currentState || this.trainingStep >= this.config.trainingSteps) {
             return
@@ -191,5 +201,11 @@ export class Orchestrator {
 
     failEpisode () {
         this.currentState = null
+
+        const randomLimit = this.config.boundSize * 0.4
+        this.drone.reset(new Vector3(
+            Math.random(),
+            Math.random(),
+            Math.random()).scale(Math.random() * randomLimit))
     }
 }

@@ -79,7 +79,7 @@ async function setupSimulation() {
 
     skybox.material = skyboxMaterial
 
-    const orchestrator = new Orchestrator(drone, wind, {
+    const orchestrator = new Orchestrator(scene, drone, wind, {
         stepInterval: 100,
         batchSize: 500,
         memorySize: 100_000,
@@ -87,18 +87,11 @@ async function setupSimulation() {
         targetUpdateInterval: 500,
         gamma: 0.99,
         hiddenLayerSize: 120,
-        numHiddenLayers: 2
-    })
-
-    scene.onBeforePhysicsObservable.add(async () => {
-        if(drone.mesh.absolutePosition.lengthSquared() > (boundSize/2) * (boundSize/2)) {
-            orchestrator.failEpisode()
-            drone.reset()
-        }
+        numHiddenLayers: 1,
+        boundSize
     })
 
     orchestrator.start()
-
 }
 
 setupSimulation()
