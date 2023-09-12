@@ -35,7 +35,8 @@ async function setupSimulation() {
     const gravityVector = new Vector3(0, -9.81, 0)
 
     const physicsEngine = await HavokPhysics()
-    const physicsPlugin = new HavokPlugin(true, physicsEngine)
+    const physicsPlugin = new HavokPlugin(false, physicsEngine)
+
     scene.enablePhysics(gravityVector, physicsPlugin)
 
     let camera: ArcRotateCamera = new ArcRotateCamera("Camera", Math.PI / 2, Math.PI * 3 / 8, 15, Vector3.Zero(), scene)
