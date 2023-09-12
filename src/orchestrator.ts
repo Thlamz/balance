@@ -27,11 +27,11 @@ export class Orchestrator {
     drone: DroneEntity
     wind: Wind
     currentState: StateArray | null
-    currentAction: number
+    currentAction: number | null
 
     config: Configuration
 
-    interval: number
+    interval: number | undefined
 
     epsilon: number
 
@@ -58,6 +58,8 @@ export class Orchestrator {
 
         this.shouldTrain = train
 
+        this.currentState = null
+        this.currentAction = null
 
         scene.onBeforePhysicsObservable.add(async () => {
             if(drone.mesh.absolutePosition.lengthSquared() > (config.boundSize/2) * (config.boundSize/2)) {
@@ -66,7 +68,7 @@ export class Orchestrator {
         })
     }
 
-    _optimize: boolean
+    _optimize: boolean = false
     get shouldTrain() {
         return this._optimize
     }
@@ -83,7 +85,7 @@ export class Orchestrator {
         this._optimize = value
     }
 
-    async loadModel(path) {
+    async loadModel(path: string) {
         const isTraining = this.shouldTrain
         this.shouldTrain = false
         await this.policy.load(path)
@@ -122,7 +124,7 @@ export class Orchestrator {
     private async optimize (nextState: StateArray) {
         this.epsilon = Math.exp(-1. * this.trainingStep / 1000)
 
-        if(!this.currentState || this.trainingStep >= this.config.trainingSteps) {
+        if(!this.currentState || !this.currentAction || this.trainingStep >= this.config.trainingSteps) {
             return
         }
 
@@ -145,7 +147,7 @@ export class Orchestrator {
                 const rewardedNextQs = bestNextQs.add(rewards)
                 return rewardedNextQs.mul(this.config.gamma)
             })
-            const guessedQArray = guessedQs.arraySync()
+            const guessedQArray = <number[][]> guessedQs.arraySync()
             const expectedArray = expectedQs.flatten().arraySync()
             for(let index = 0; index < this.config.batchSize; index++) {
                 guessedQArray[index][samples[index][2]] = expectedArray[index]
@@ -189,7 +191,7 @@ export class Orchestrator {
         this.interval = window.setTimeout(() => this.loop(), this.config.stepInterval)
     }
 
-    private _log: string
+    private _log: string = ""
     log (message: any) {
         this._log += message + "\n"
     }

@@ -10,7 +10,7 @@ export type StateArray = number[]
 export const STATE_SIZE = 13
 
 export function collectState(drone: DroneEntity, wind: Wind): StateArray {
-    const state = []
+    const state: StateArray = []
     drone.physics.transformNode.absolutePosition.toArray(state)
     drone.physics.transformNode.rotation.toArray(state, state.length)
     drone.physics.body.getLinearVelocity().toArray(state, state.length)

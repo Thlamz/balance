@@ -5,7 +5,7 @@ import DroneEntity from "./drone";
  */
 export type ActionArray = [number, number, number, number]
 
-export const ACTION_MAP = [
+export const ACTION_MAP: ActionArray[] = [
     [0.7,0.7,0.7,0.7],
     [0.9,0.7,0.7,0.7],
     [0.7,0.9,0.7,0.7],
