@@ -138,19 +138,27 @@ export class Orchestrator {
             const stateBatch = tf.tensor(samples.map((memory) => memory[0]))
             const guessedQs = this.policy.predict(stateBatch)
 
+            const rewards =samples.map(memory => memory[3])
+
+            const nonTerminalSamples = samples.map((memory) => memory[1] !== null)
+
             const expectedQs: tf.Tensor = tf.tidy(() => {
-                const nextStateBatch = tf.tensor(samples.map((memory) => memory[1]))
+                // Terminal states are handled separately, so they are not considered in this calculation
+                const nextStateBatch = tf.tensor(<StateArray[]> samples.map((memory) => memory[1]).filter(s => s !== null))
                 let nextQs = this.target.predict(nextStateBatch)
                 const bestIndexes = nextQs.argMax(1)
-                const rewards = tf.tensor(samples.map(memory => memory[3]))
                 const bestNextQs = nextQs.gather(bestIndexes, 1, 1)
-                const rewardedNextQs = bestNextQs.add(rewards)
+                const rewardedNextQs = bestNextQs.add(tf.tensor(rewards.filter((_, i) => nonTerminalSamples[i])))
                 return rewardedNextQs.mul(this.config.gamma)
             })
             const guessedQArray = <number[][]> guessedQs.arraySync()
             const expectedArray = expectedQs.flatten().arraySync()
+
+            // Handling terminal states by filling them directly with their reward
+            const expectedArrayWithFilledGaps: number[] = nonTerminalSamples.map((v, i) => v ? expectedArray.shift()! : rewards[i])
+
             for(let index = 0; index < this.config.batchSize; index++) {
-                guessedQArray[index][samples[index][2]] = expectedArray[index]
+                guessedQArray[index][samples[index][2]] = expectedArrayWithFilledGaps[index]
             }
 
             const info = await this.policy.optimize(stateBatch, tf.tensor(guessedQArray));
@@ -203,7 +211,7 @@ export class Orchestrator {
 
     failEpisode () {
         if(this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
-            this.memory.add(this.currentState, this.currentState, this.currentAction, -100)
+            this.memory.add(this.currentState, null, this.currentAction, -100)
         }
 
         this.currentState = null
