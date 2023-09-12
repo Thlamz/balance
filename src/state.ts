@@ -5,8 +5,7 @@ import Wind from "./wind";
  * Current state of the simulation
  * [x, y, z, rx, ry, rz, vx, vy, vz, vrx, vry, vrz windDirection]
  */
-export type StateArray = [number, number, number, number, number, number, number,
-    number, number, number, number, number, number]
+export type StateArray = number[]
 
 export const STATE_SIZE = 13
 
