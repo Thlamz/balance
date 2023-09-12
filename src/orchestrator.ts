@@ -124,7 +124,7 @@ export class Orchestrator {
     private async optimize (nextState: StateArray) {
         this.epsilon = Math.exp(-1. * this.trainingStep / 2000)
 
-        if(!this.currentState || !this.currentAction || this.trainingStep >= this.config.trainingSteps) {
+        if(this.currentState === null || this.currentAction === null || this.trainingStep >= this.config.trainingSteps) {
             return
         }
 
@@ -203,6 +203,7 @@ export class Orchestrator {
 
     failEpisode () {
         this.currentState = null
+        this.currentAction = null
 
         const randomLimit = this.config.boundSize * 0.4
         this.drone.reset(new Vector3(
