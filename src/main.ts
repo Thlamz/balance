@@ -80,7 +80,7 @@ async function setupSimulation() {
     skybox.material = skyboxMaterial
 
     const orchestrator = new Orchestrator(scene, drone, wind, {
-        stepInterval: 100,
+        stepInterval: 10,
         batchSize: 128,
         memorySize: 100_000,
         trainingSteps: 10_000,
