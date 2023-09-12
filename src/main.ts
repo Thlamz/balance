@@ -81,7 +81,7 @@ async function setupSimulation() {
 
     const orchestrator = new Orchestrator(scene, drone, wind, {
         stepInterval: 100,
-        batchSize: 500,
+        batchSize: 128,
         memorySize: 100_000,
         trainingSteps: 10_000,
         targetUpdateInterval: 500,

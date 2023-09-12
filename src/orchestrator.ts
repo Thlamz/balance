@@ -122,7 +122,7 @@ export class Orchestrator {
     }
 
     private async optimize (nextState: StateArray) {
-        this.epsilon = Math.exp(-1. * this.trainingStep / 1000)
+        this.epsilon = Math.exp(-1. * this.trainingStep / 2000)
 
         if(!this.currentState || !this.currentAction || this.trainingStep >= this.config.trainingSteps) {
             return
