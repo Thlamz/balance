@@ -69,8 +69,9 @@ export default class Wind {
         })
 
 
-        scene.onBeforePhysicsObservable.add(() => {
-            const force = new Vector3(Math.sin(this.windDirection), 0, Math.cos(this.windDirection)).normalize().scale(this.speed);
+        scene.onBeforePhysicsObservable.add((scene) => {
+            const windSpeed = this.speed * scene.deltaTime
+            const force = new Vector3(Math.sin(this.windDirection), 0, Math.cos(this.windDirection)).normalize().scale();
             affectedEntities.forEach(e => e.body.applyForce(
                 force,
                 e.transformNode.absolutePosition

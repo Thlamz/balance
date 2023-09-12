@@ -224,7 +224,7 @@ export default class DroneEntity {
             this.props[1].absolutePosition,
             this.props[2].absolutePosition).normal
         for (let index = 0; index < this.propSpeeds.length; index++) {
-            const speed = this.propSpeeds[index] * 10 / 4
+            const speed = this.propSpeeds[index] / 6 * this.scene.deltaTime
             const direction = angle.scale(speed)
             this.physics.body.applyForce(direction, this.props[index].absolutePosition)
         }

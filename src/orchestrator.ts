@@ -202,13 +202,18 @@ export class Orchestrator {
     }
 
     failEpisode () {
+        if(this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
+            this.memory.add(this.currentState, this.currentState, this.currentAction, -100)
+        }
+
         this.currentState = null
         this.currentAction = null
 
-        const randomLimit = this.config.boundSize * 0.4
+        const randomLimit = this.config.boundSize * 0.8
+        const scale = (Math.random() - 0.5) * 2 * randomLimit
         this.drone.reset(new Vector3(
             Math.random(),
             Math.random(),
-            Math.random()).scale(Math.random() * randomLimit))
+            Math.random()).scale(scale))
     }
 }
