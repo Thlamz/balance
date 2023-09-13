@@ -17,7 +17,7 @@ interface Configuration {
     gamma: number
     hiddenLayerSize: number
     numHiddenLayers: number,
-    boundSize: number
+    boundDiameter: number
     epsilonDecay: number
 }
 
@@ -63,8 +63,14 @@ export class Orchestrator {
         this.currentAction = null
 
         scene.onBeforePhysicsObservable.add(async () => {
-            if(drone.mesh.absolutePosition.lengthSquared() > (config.boundSize/2) * (config.boundSize/2)) {
-                this.failEpisode()
+            if(drone.mesh.absolutePosition.lengthSquared() > (config.boundDiameter/2) * (config.boundDiameter/2)) {
+                this.resetEpisode()
+            }
+        })
+
+        window.addEventListener("keypress", (event) => {
+            if(event.key == "r") {
+                this.resetEpisode()
             }
         })
     }
@@ -79,7 +85,11 @@ export class Orchestrator {
             this.epsilon = 1
         } else {
             this.epsilon = 0
-            this.policy.save().then(() => console.log("MODEL EXPORTED"));
+
+            // If it was training and is not anymore, saves the model
+            if(this.shouldTrain) {
+                this.policy.save().then(() => console.log("MODEL EXPORTED"));
+            }
         }
         this.trainingStep = 0
         this.memory.clear()
@@ -102,8 +112,12 @@ export class Orchestrator {
         clearInterval(this.interval)
     }
 
+    /**
+     * The negative normalized distance squared to the center of the scene
+     */
     computeReward(drone: DroneEntity): number {
-        return -drone.physics.transformNode.absolutePosition.lengthSquared()
+        const boundSizeSquared = (this.config.boundDiameter/2) * (this.config.boundDiameter/2)
+        return -drone.physics.transformNode.absolutePosition.lengthSquared() / boundSizeSquared
     }
 
     choose(state: StateArray): number {
@@ -210,15 +224,17 @@ export class Orchestrator {
         this._log = ""
     }
 
-    failEpisode () {
+    resetEpisode () {
         if(this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
+            this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, -100])
             this.memory.add(this.currentState, null, this.currentAction, -100)
+            this.flush()
         }
 
         this.currentState = null
         this.currentAction = null
 
-        const randomLimit = this.config.boundSize * 0.8
+        const randomLimit = this.config.boundDiameter * 0.8
         const scale = (Math.random() - 0.5) * 2 * randomLimit
         this.drone.reset(new Vector3(
             Math.random(),
