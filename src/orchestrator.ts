@@ -18,6 +18,7 @@ interface Configuration {
     hiddenLayerSize: number
     numHiddenLayers: number,
     boundSize: number
+    epsilonDecay: number
 }
 
 
@@ -122,7 +123,7 @@ export class Orchestrator {
     }
 
     private async optimize (nextState: StateArray) {
-        this.epsilon = Math.exp(-1. * this.trainingStep / 2000)
+        this.epsilon = Math.exp(-1. * this.trainingStep / this.config.epsilonDecay)
 
         if(this.currentState === null || this.currentAction === null || this.trainingStep >= this.config.trainingSteps) {
             return

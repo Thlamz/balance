@@ -84,13 +84,14 @@ async function setupSimulation() {
         stepInterval: 10,
         batchSize: 128,
         memorySize: 100_000,
-        trainingSteps: 10_000,
+        trainingSteps: 100_000,
         targetUpdateInterval: 500,
         gamma: 0.99,
         hiddenLayerSize: 120,
         numHiddenLayers: 1,
-        boundSize
-    })
+        boundSize,
+        epsilonDecay: 20000
+    }, false)
 
     orchestrator.start()
 }
