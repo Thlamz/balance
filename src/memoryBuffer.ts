@@ -1,6 +1,6 @@
 import {StateArray} from "./state";
 
-export type Memory = [StateArray, StateArray | null, number, number]
+export type Memory = [StateArray, StateArray, [number, number, number, number], number, boolean]
 
 export class MemoryBuffer {
     private memory: Memory[]
@@ -14,8 +14,12 @@ export class MemoryBuffer {
         this.maxSize = maxSize
     }
 
-    add(state: StateArray, nextState: StateArray | null, action: number, reward: number) {
-        this.memory[this.currentIndex] = [state, nextState, action, reward]
+    add(state: StateArray,
+        nextState: StateArray | null,
+        action: [number, number, number, number],
+        reward: number,
+        terminal: boolean = false) {
+        this.memory[this.currentIndex] = [state, nextState || state, action, reward, terminal]
 
         this.currentIndex++
         this.currentSize = Math.min(this.currentSize + 1, this.maxSize)
