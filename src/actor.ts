@@ -8,18 +8,23 @@ export class Actor {
     public optimizer: tf.Optimizer
     constructor(numHiddenLayers: number, hiddenLayerSize: number) {
         const network = tf.sequential();
-        new Array(numHiddenLayers).fill(hiddenLayerSize).forEach((hiddenLayerSize, i) => {
+        for (let i=0; i < numHiddenLayers; i++) {
             network.add(tf.layers.dense({
                 units: hiddenLayerSize,
                 activation: 'relu',
                 // `inputShape` is required only for the first layer.
-                inputShape: i === 0 ? [STATE_SIZE] : undefined
+                inputShape: i === 0 ? [STATE_SIZE] : undefined,
+                kernelInitializer: tf.initializers.randomUniform({minval: -3e-3, maxval: 3e-3})
             }));
-        });
+            network.add(tf.layers.layerNormalization())
+        }
         network.add(tf.layers.dense({units: 4, activation: 'sigmoid'}));
 
         network.summary();
-        network.compile({optimizer: 'adam', loss: 'meanSquaredError'});
+        network.compile({
+            optimizer: 'adam',
+            loss: 'meanSquaredError'
+        });
         this.network = network
         this.optimizer = tf.train.adam()
     }

@@ -6,14 +6,14 @@ export class Critic {
     public network: Sequential
     constructor(numHiddenLayers: number, hiddenLayerSize: number) {
         const network = tf.sequential();
-        new Array(numHiddenLayers).fill(hiddenLayerSize).forEach((hiddenLayerSize, i) => {
+        for (let i=0;i < numHiddenLayers; i++) {
             network.add(tf.layers.dense({
                 units: hiddenLayerSize,
-                activation: 'relu',
+                activation: 'elu',
                 // `inputShape` is required only for the first layer.
                 inputShape: i === 0 ? [STATE_SIZE + 4] : undefined
             }));
-        });
+        }
         network.add(tf.layers.dense({units: 1}));
 
         network.summary();
@@ -30,7 +30,12 @@ export class Critic {
 
     public async optimize(states: tf.Tensor, actions: tf.Tensor, yBatch: tf.Tensor): Promise<number> {
         const xBatch = tf.tidy(() => tf.concat([states, actions], 1))
-        return <number>(await this.network.fit(xBatch, yBatch)).history.loss[0]
+        const loss =  <number>(await this.network.fit(xBatch, yBatch, {
+            batchSize: yBatch.shape[0],
+            epochs: 1
+        })).history.loss[0]
+        xBatch.dispose()
+        return loss
     }
 
     public loadWeights(weights: tf.Tensor[]) {

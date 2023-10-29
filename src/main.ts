@@ -35,7 +35,7 @@ async function setupSimulation() {
     const gravityVector = new Vector3(0, -9.81, 0)
 
     const physicsEngine = await HavokPhysics()
-    const physicsPlugin = new HavokPlugin(false, physicsEngine)
+    const physicsPlugin = new HavokPlugin(true, physicsEngine)
 
     scene.enablePhysics(gravityVector, physicsPlugin)
 
@@ -81,17 +81,18 @@ async function setupSimulation() {
     skybox.material = skyboxMaterial
 
     const orchestrator = new Orchestrator(scene, drone, wind, {
-        stepInterval: 100,
-        batchSize: 128,
+        stepInterval: 1,
+        batchSize: 64,
         memorySize: 10_000,
-        trainingSteps: 10_000,
-        targetUpdateInterval: 500,
+        trainingSteps: 1_000,
+        targetUpdateInterval: 50,
         gamma: 0.99,
         hiddenLayerSize: 64,
-        numHiddenLayers: 1,
+        numHiddenLayers: 2,
         boundDiameter: boundSize,
-        epsilonDecay: 1000,
-        episodeLimit: 300
+        epsilonDecay: 300,
+        episodeLimit: 500,
+        tau: 0.005
     }, true)
 
     orchestrator.start()

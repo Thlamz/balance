@@ -21,6 +21,7 @@ interface Configuration {
     boundDiameter: number
     epsilonDecay: number,
     episodeLimit: number
+    tau: number
 }
 
 
@@ -52,6 +53,10 @@ export class Orchestrator {
 
     avgReward: number = 0
     rewardCounts: number = 0;
+
+    actorLosses: number[] = []
+    criticLosses: number[] = []
+    avgRewards: number[] = []
 
     constructor(scene: Scene, drone: DroneEntity, wind: Wind, config: Configuration, train = true) {
         this.scene = scene
@@ -97,6 +102,33 @@ export class Orchestrator {
         return this._optimize
     }
 
+    plot() {
+        const x = this.criticLosses.map((_v, i) => i)
+        const maxCritic = Math.max(...this.criticLosses)
+        const trace1: Plotly.Data = {
+            x,
+            y: this.criticLosses.map(l => l / maxCritic),
+            type: 'scatter',
+            name: "Critic Loss"
+        };
+        const trace2: Plotly.Data = {
+            x,
+            y: this.actorLosses,
+            type: 'scatter',
+            name: "Actor Loss"
+        };
+        const trace3: Plotly.Data = {
+            x,
+            y: this.avgRewards,
+            type: 'scatter',
+            name: "Avg Rewards"
+        };
+
+
+        const data = [trace1, trace2, trace3];
+        Plotly.newPlot('plot', data);
+    }
+
     set shouldTrain(value: boolean) {
         if(value) {
             this.epsilon = 1
@@ -107,6 +139,8 @@ export class Orchestrator {
             if(this.shouldTrain) {
                 this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
                 this.criticMain.save().then(() => console.log("CRITIC EXPORTED"));
+
+                this.plot()
             }
         }
         this.trainingStep = 0
@@ -163,10 +197,11 @@ export class Orchestrator {
 
         this.rewardCounts += 1
         this.avgReward = (this.avgReward * (this.rewardCounts - 1) + reward) / this.rewardCounts
+        this.log(`REWARD = ${reward}`)
+        this.log(`AVG REWARD = ${this.avgReward}`)
 
         this.memory.add(this.currentState, nextState, this.currentAction, reward)
         this.log(`ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, reward])
-        this.log(`AVG REWARD = ${this.avgReward}`)
         if (this.memory.size > this.config.batchSize) {
             this.log("OPTIMIZING")
             const samples: Memory[] = this.memory.sample(this.config.batchSize)
@@ -184,13 +219,14 @@ export class Orchestrator {
             )
 
 
+            const targetValues = tf.tidy(() => {
+                const targetActions = this.actorTarget.predict(nextStateBatch)
+                const targetNextStateValues = this.criticTarget.predict(nextStateBatch, targetActions)
 
-            const targetActions = this.actorTarget.predict(nextStateBatch)
-            const targetNextStateValues = this.criticTarget.predict(nextStateBatch, targetActions)
-
-            const discountedNextStateValues = targetNextStateValues.mul(this.config.gamma)
-            const terminalNextStateValues = discountedNextStateValues.mul(terminalBatch)
-            const targetValues = terminalNextStateValues.add(rewardsBatch)
+                const discountedNextStateValues = targetNextStateValues.mul(this.config.gamma)
+                const terminalNextStateValues = discountedNextStateValues.mul(terminalBatch)
+                return terminalNextStateValues.add(rewardsBatch)
+            })
 
             const criticInfo = await this.criticMain.optimize(stateBatch, actionBatch, targetValues);
 
@@ -201,19 +237,15 @@ export class Orchestrator {
             nextStateBatch.dispose()
             actionBatch.dispose()
             rewardsBatch.dispose()
-            targetActions.dispose()
-            discountedNextStateValues.dispose()
-            terminalNextStateValues.dispose()
+            terminalBatch.dispose()
             targetValues.dispose()
-            targetNextStateValues.dispose()
             this.log(`CRITIC LOSS = ${criticInfo}`)
             this.log(`ACTOR LOSS = ${actorInfo}`)
+            this.avgRewards.push(this.avgReward)
+            this.actorLosses.push(actorInfo)
+            this.criticLosses.push(criticInfo)
 
-            if (this.trainingStep % this.config.targetUpdateInterval == 0) {
-                this.actorTarget.loadWeights(this.actorMain.getWeights())
-                this.criticTarget.loadWeights(this.criticMain.getWeights())
-                this.log("UPDATING TARGET")
-            }
+            this.updateWeights()
         }
     }
 
@@ -247,6 +279,20 @@ export class Orchestrator {
         this.interval = window.setTimeout(() => this.loop(), this.config.stepInterval)
     }
 
+    updateWeights () {
+        const actorTargetWeights = this.actorTarget.getWeights()
+        const actorWeights = this.actorMain.getWeights().map((w, i) => (
+            tf.tidy(() => w.mul(this.config.tau).add(actorTargetWeights[i].mul(1-this.config.tau)))
+        ))
+        this.actorTarget.loadWeights(actorWeights)
+
+        const criticTargetWeights = this.criticTarget.getWeights()
+        const criticWeights = this.criticMain.getWeights().map((w, i) => (
+            tf.tidy(() => w.mul(this.config.tau).add(criticTargetWeights[i].mul(1-this.config.tau)))
+        ))
+        this.criticTarget.loadWeights(criticWeights)
+    }
+
     private _log: string = ""
     log (message: any) {
         this._log += message + "\n"
@@ -259,10 +305,11 @@ export class Orchestrator {
 
     resetEpisode (failed: boolean = true) {
         if(failed && this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
-            this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, -100])
-            this.memory.add(this.currentState, null, this.currentAction, -100, true)
+            const punishment = -1
+            this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, punishment])
+            this.memory.add(this.currentState, null, this.currentAction, punishment, true)
             this.rewardCounts++
-            this.avgReward = (this.avgReward * (this.rewardCounts - 1) + -100) / this.rewardCounts
+            this.avgReward = (this.avgReward * (this.rewardCounts - 1) + punishment) / this.rewardCounts
             this.flush()
         }
 
@@ -270,12 +317,12 @@ export class Orchestrator {
         this.currentAction = null
         this.currentEpisodeDuration = 0
 
-        const randomLimit = this.config.boundDiameter * 0.8
-        const scale = (Math.random() - 0.5) * 2 * randomLimit
-        this.drone.reset(new Vector3(
-            Math.random(),
-            Math.random(),
-            Math.random()).scale(scale))
-        this.drone.reset(new Vector3(0, 0,0))
+        // const randomLimit = this.config.boundDiameter * 0.8
+        // const scale = (Math.random() - 0.5) * 2 * randomLimit
+        // this.drone.reset(new Vector3(
+        //     Math.random(),
+        //     Math.random(),
+        //     Math.random()).scale(scale))
+        this.drone.reset(new Vector3(0,0,0))
     }
 }
