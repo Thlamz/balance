@@ -18,7 +18,8 @@ interface Configuration {
     hiddenLayerSize: number
     numHiddenLayers: number,
     boundDiameter: number
-    epsilonDecay: number
+    epsilonDecay: number,
+    episodeLimit: number
 }
 
 
@@ -41,6 +42,8 @@ export class Orchestrator {
     policy: Model
     target: Model
 
+    currentEpisodeDuration: number
+
     trainingStep: number
     constructor(scene: Scene, drone: DroneEntity, wind: Wind, config: Configuration, train = true) {
         this.scene = scene
@@ -62,6 +65,8 @@ export class Orchestrator {
         this.currentState = null
         this.currentAction = null
 
+        this.currentEpisodeDuration = 0
+
         scene.onBeforePhysicsObservable.add(async () => {
             if(drone.mesh.absolutePosition.lengthSquared() > (config.boundDiameter/2) * (config.boundDiameter/2)) {
                 this.resetEpisode()
@@ -70,7 +75,7 @@ export class Orchestrator {
 
         window.addEventListener("keypress", (event) => {
             if(event.key == "r") {
-                this.resetEpisode()
+                this.resetEpisode(false)
             }
         })
     }
@@ -92,6 +97,7 @@ export class Orchestrator {
             }
         }
         this.trainingStep = 0
+        this.currentEpisodeDuration = 0
         this.memory.clear()
         this._optimize = value
     }
@@ -205,6 +211,11 @@ export class Orchestrator {
         this.currentAction = action
 
         this.trainingStep++
+        this.currentEpisodeDuration++
+
+        if(this.currentEpisodeDuration >= this.config.episodeLimit) {
+            this.resetEpisode(false)
+        }
 
         if(this.trainingStep === this.config.trainingSteps) {
             this.shouldTrain = false
@@ -224,8 +235,8 @@ export class Orchestrator {
         this._log = ""
     }
 
-    resetEpisode () {
-        if(this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
+    resetEpisode (failed: boolean = true) {
+        if(failed && this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
             this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, -100])
             this.memory.add(this.currentState, null, this.currentAction, -100)
             this.flush()
@@ -233,6 +244,7 @@ export class Orchestrator {
 
         this.currentState = null
         this.currentAction = null
+        this.currentEpisodeDuration = 0
 
         const randomLimit = this.config.boundDiameter * 0.8
         const scale = (Math.random() - 0.5) * 2 * randomLimit
