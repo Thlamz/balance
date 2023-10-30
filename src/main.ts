@@ -87,7 +87,7 @@ async function setupSimulation() {
         trainingSteps: 1_000,
         actorUpdateInterval: 2,
         gamma: 0.99,
-        hiddenLayerSize: 64,
+        hiddenLayerSize: 128,
         numHiddenLayers: 2,
         boundDiameter: boundSize,
         epsilonDecay: 300,

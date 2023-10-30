@@ -3,7 +3,7 @@ import DroneEntity from "./drone";
 import Wind from "./wind";
 import * as tf from "@tensorflow/tfjs"
 import {Memory, MemoryBuffer} from "./memoryBuffer";
-import {applyAction} from "./action";
+import {ACTION_SIZE, applyAction} from "./action";
 import {Scene} from "@babylonjs/core/scene";
 import {Vector3} from "@babylonjs/core/Maths/math.vector";
 import {Actor} from "./actor.ts";
@@ -33,7 +33,7 @@ export class Orchestrator {
     drone: DroneEntity
     wind: Wind
     currentState: StateArray | null
-    currentAction: [number, number, number, number] | null
+    currentAction: number[] | null
 
     config: Configuration
 
@@ -190,16 +190,16 @@ export class Orchestrator {
      */
     computeReward(drone: DroneEntity): number {
         const boundSizeSquared = (this.config.boundDiameter/2) * (this.config.boundDiameter/2)
-        return -drone.physics.transformNode.absolutePosition.lengthSquared() / boundSizeSquared
+        return -(drone.physics.transformNode.absolutePosition.lengthSquared() / boundSizeSquared)
     }
 
-    choose(state: StateArray): [number, number, number, number] {
+    choose(state: StateArray): number[] {
         if (Math.random() > this.epsilon || !this.shouldTrain) {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - PREDICTED`)
             const prediction: tf.Tensor = tf.tidy(() => {
                 return this.actorMain.predict(tf.tensor(state)).flatten()
             })
-            return <[number, number, number, number]> prediction.arraySync()
+            return <number[]> prediction.arraySync()
         } else {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - RNG`)
             return [Math.random(), Math.random(), Math.random(), Math.random()]
@@ -231,7 +231,8 @@ export class Orchestrator {
             const stateBatch = tf.tensor(samples.map((memory) => memory[0]))
             const nextStateBatch = tf.tensor(<StateArray[]> samples
                 .map((memory) => memory[1]))
-            const actionBatch = tf.tensor(samples.map(m => m[2]))
+            const actionBatch = tf.tensor(samples.map(m => m[2]),
+                [this.config.batchSize, ACTION_SIZE])
             const rewardsBatch = tf.tensor(rewards, [this.config.batchSize, 1])
             const terminalBatch = tf.tensor(
                 samples.map(m => +m[4]),
@@ -261,6 +262,7 @@ export class Orchestrator {
             let actorInfo: number
             if (this.trainingStep % this.config.actorUpdateInterval === 0) {
                 actorInfo = await this.actorMain.optimize(stateBatch, this.criticMain1)
+                this.updateWeights()
             } else {
                 actorInfo = this.actorLosses[this.actorLosses.length - 1]
             }
@@ -279,8 +281,6 @@ export class Orchestrator {
             this.actorLosses.push(actorInfo)
             this.critic1Losses.push(criticInfo1)
             this.critic2Losses.push(criticInfo2)
-
-            this.updateWeights()
         }
     }
 
@@ -346,9 +346,10 @@ export class Orchestrator {
 
     resetEpisode (failed: boolean = true) {
         if(failed && this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
-            const punishment = -1
+            const punishment = -10
             this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, punishment])
-            this.memory.add(this.currentState, null, this.currentAction, punishment, true)
+            const state = collectState(this.drone, this.wind)
+            this.memory.add(state, null, this.currentAction, punishment, true)
             this.rewardCounts++
             this.avgReward = (this.avgReward * (this.rewardCounts - 1) + punishment) / this.rewardCounts
             this.flush()

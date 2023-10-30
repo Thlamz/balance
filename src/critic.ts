@@ -1,6 +1,7 @@
 import * as tf from "@tensorflow/tfjs";
 import {Sequential} from "@tensorflow/tfjs";
 import {STATE_SIZE} from "./state";
+import {ACTION_SIZE} from "./action.ts";
 
 export class Critic {
     public network: Sequential
@@ -11,7 +12,7 @@ export class Critic {
                 units: hiddenLayerSize,
                 activation: 'elu',
                 // `inputShape` is required only for the first layer.
-                inputShape: i === 0 ? [STATE_SIZE + 4] : undefined
+                inputShape: i === 0 ? [STATE_SIZE + ACTION_SIZE] : undefined
             }));
         }
         network.add(tf.layers.dense({units: 1}));
@@ -24,7 +25,7 @@ export class Critic {
     public predict(states: tf.Tensor, actions: tf.Tensor): tf.Tensor {
         return <tf.Tensor> tf.tidy(() => {
             const input = tf.concat([states, actions], 1)
-            return this.network.predict(input.reshape([-1, STATE_SIZE + 4]))
+            return this.network.predict(input.reshape([-1, STATE_SIZE + ACTION_SIZE]))
         })
     }
 

@@ -1,6 +1,6 @@
 import {StateArray} from "./state";
 
-export type Memory = [StateArray, StateArray, [number, number, number, number], number, boolean]
+export type Memory = [StateArray, StateArray, number[], number, boolean]
 
 export class MemoryBuffer {
     private memory: Memory[]
@@ -16,7 +16,7 @@ export class MemoryBuffer {
 
     add(state: StateArray,
         nextState: StateArray | null,
-        action: [number, number, number, number],
+        action: number[],
         reward: number,
         terminal: boolean = false) {
         this.memory[this.currentIndex] = [state, nextState || state, action, reward, terminal]

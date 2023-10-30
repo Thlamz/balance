@@ -2,6 +2,7 @@ import * as tf from "@tensorflow/tfjs";
 import {Sequential} from "@tensorflow/tfjs";
 import {STATE_SIZE} from "./state";
 import {Critic} from "./critic.ts";
+import {ACTION_SIZE} from "./action.ts";
 
 export class Actor {
     public network: Sequential
@@ -16,7 +17,7 @@ export class Actor {
                 inputShape: i === 0 ? [STATE_SIZE] : undefined
             }));
         }
-        network.add(tf.layers.dense({units: 4, activation: 'sigmoid'}));
+        network.add(tf.layers.dense({units: ACTION_SIZE, activation: 'sigmoid'}));
 
         network.summary();
         this.network = network
