@@ -4,7 +4,7 @@ import {STATE_SIZE} from "./state";
 
 export class Critic {
     public network: Sequential
-    constructor(numHiddenLayers: number, hiddenLayerSize: number) {
+    constructor(numHiddenLayers: number, hiddenLayerSize: number, lr: number) {
         const network = tf.sequential();
         for (let i=0;i < numHiddenLayers; i++) {
             network.add(tf.layers.dense({
@@ -17,7 +17,7 @@ export class Critic {
         network.add(tf.layers.dense({units: 1}));
 
         network.summary();
-        network.compile({optimizer: 'adam', loss: 'meanSquaredError'});
+        network.compile({optimizer: tf.train.adam(lr), loss: 'meanSquaredError'});
         this.network = network
     }
 

@@ -14,14 +14,16 @@ interface Configuration {
     trainingSteps: number
     memorySize: number
     batchSize: number,
-    targetUpdateInterval: number
+    actorUpdateInterval: number
     gamma: number
     hiddenLayerSize: number
-    numHiddenLayers: number,
+    numHiddenLayers: number
     boundDiameter: number
     epsilonDecay: number,
     episodeLimit: number
-    tau: number
+    tau: number,
+    actorLR: number,
+    criticLR: number,
 }
 
 
@@ -44,8 +46,11 @@ export class Orchestrator {
     actorMain: Actor;
     actorTarget: Actor;
 
-    criticMain: Critic
-    criticTarget: Critic
+    criticMain1: Critic
+    criticTarget1: Critic
+
+    criticMain2: Critic
+    criticTarget2: Critic
 
     currentEpisodeDuration: number
 
@@ -55,7 +60,8 @@ export class Orchestrator {
     rewardCounts: number = 0;
 
     actorLosses: number[] = []
-    criticLosses: number[] = []
+    critic1Losses: number[] = []
+    critic2Losses: number[] = []
     avgRewards: number[] = []
 
     constructor(scene: Scene, drone: DroneEntity, wind: Wind, config: Configuration, train = true) {
@@ -66,13 +72,17 @@ export class Orchestrator {
 
         this.memory = new MemoryBuffer(config['memorySize'])
 
-        this.actorMain = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize)
-        this.actorTarget = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize)
+        this.actorMain = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.actorLR)
+        this.actorTarget = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.actorLR)
         this.actorTarget.loadWeights(this.actorMain.getWeights())
 
-        this.criticMain = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize)
-        this.criticTarget = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize)
-        this.criticTarget.loadWeights(this.criticMain.getWeights())
+        this.criticMain1 = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget1 = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget1.loadWeights(this.criticMain1.getWeights())
+
+        this.criticMain2 = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget2 = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget2.loadWeights(this.criticMain2.getWeights())
 
         this.trainingStep = 0
         this.epsilon = 0
@@ -103,21 +113,30 @@ export class Orchestrator {
     }
 
     plot() {
-        const x = this.criticLosses.map((_v, i) => i)
-        const maxCritic = Math.max(...this.criticLosses)
+        const x = this.critic1Losses.map((_v, i) => i)
+        const maxCritic1 = Math.max(...this.critic1Losses)
         const trace1: Plotly.Data = {
             x,
-            y: this.criticLosses.map(l => l / maxCritic),
+            y: this.critic1Losses.map(l => l / maxCritic1),
             type: 'scatter',
-            name: "Critic Loss"
+            name: "Critic 1 Loss"
         };
+
+        const maxCritic2 = Math.max(...this.critic2Losses)
         const trace2: Plotly.Data = {
+            x,
+            y: this.critic2Losses.map(l => l / maxCritic2),
+            type: 'scatter',
+            name: "Critic 2 Loss"
+        };
+
+        const trace3: Plotly.Data = {
             x,
             y: this.actorLosses,
             type: 'scatter',
             name: "Actor Loss"
         };
-        const trace3: Plotly.Data = {
+        const trace4: Plotly.Data = {
             x,
             y: this.avgRewards,
             type: 'scatter',
@@ -125,7 +144,7 @@ export class Orchestrator {
         };
 
 
-        const data = [trace1, trace2, trace3];
+        const data = [trace1, trace2, trace3, trace4];
         Plotly.newPlot('plot', data);
     }
 
@@ -137,8 +156,9 @@ export class Orchestrator {
 
             // If it was training and is not anymore, saves the model
             if(this.shouldTrain) {
-                this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
-                this.criticMain.save().then(() => console.log("CRITIC EXPORTED"));
+                // this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
+                // this.criticMain1.save().then(() => console.log("CRITIC EXPORTED"));
+                // this.criticMain2.save().then(() => console.log("CRITIC EXPORTED"));
 
                 this.plot()
             }
@@ -150,11 +170,11 @@ export class Orchestrator {
     }
 
     async loadModel(actor: string, critic: string) {
-        const isTraining = this.shouldTrain
-        this.shouldTrain = false
-        await this.actorMain.load(actor)
-        await this.criticMain.load(critic)
-        this.shouldTrain = isTraining
+        // const isTraining = this.shouldTrain
+        // this.shouldTrain = false
+        // await this.actorMain.load(actor)
+        // await this.criticMain.load(critic)
+        // this.shouldTrain = isTraining
     }
 
     start() {
@@ -220,17 +240,30 @@ export class Orchestrator {
 
 
             const targetValues = tf.tidy(() => {
-                const targetActions = this.actorTarget.predict(nextStateBatch)
-                const targetNextStateValues = this.criticTarget.predict(nextStateBatch, targetActions)
+                const targetActionsNoNoise = this.actorTarget.predict(nextStateBatch)
+                const noise = tf
+                    .randomNormal(targetActionsNoNoise.shape, 0, 0.2)
+                    .clipByValue(-0.5, 0.5)
+                const targetActions = targetActionsNoNoise.add(noise).clipByValue(0, 1)
+
+                const targetNextStateValues1 = this.criticTarget1.predict(nextStateBatch, targetActions)
+                const targetNextStateValues2 = this.criticTarget2.predict(nextStateBatch, targetActions)
+                const targetNextStateValues = tf.minimum(targetNextStateValues1, targetNextStateValues2)
 
                 const discountedNextStateValues = targetNextStateValues.mul(this.config.gamma)
                 const terminalNextStateValues = discountedNextStateValues.mul(terminalBatch)
                 return terminalNextStateValues.add(rewardsBatch)
             })
 
-            const criticInfo = await this.criticMain.optimize(stateBatch, actionBatch, targetValues);
+            const criticInfo1 = await this.criticMain1.optimize(stateBatch, actionBatch, targetValues);
+            const criticInfo2 = await this.criticMain2.optimize(stateBatch, actionBatch, targetValues);
 
-            const actorInfo = await this.actorMain.optimize(stateBatch, this.criticMain)
+            let actorInfo: number
+            if (this.trainingStep % this.config.actorUpdateInterval === 0) {
+                actorInfo = await this.actorMain.optimize(stateBatch, this.criticMain1)
+            } else {
+                actorInfo = this.actorLosses[this.actorLosses.length - 1]
+            }
 
 
             stateBatch.dispose()
@@ -239,11 +272,13 @@ export class Orchestrator {
             rewardsBatch.dispose()
             terminalBatch.dispose()
             targetValues.dispose()
-            this.log(`CRITIC LOSS = ${criticInfo}`)
+            this.log(`CRITIC1 LOSS = ${criticInfo1}`)
+            this.log(`CRITIC2 LOSS = ${criticInfo2}`)
             this.log(`ACTOR LOSS = ${actorInfo}`)
             this.avgRewards.push(this.avgReward)
             this.actorLosses.push(actorInfo)
-            this.criticLosses.push(criticInfo)
+            this.critic1Losses.push(criticInfo1)
+            this.critic2Losses.push(criticInfo2)
 
             this.updateWeights()
         }
@@ -286,11 +321,17 @@ export class Orchestrator {
         ))
         this.actorTarget.loadWeights(actorWeights)
 
-        const criticTargetWeights = this.criticTarget.getWeights()
-        const criticWeights = this.criticMain.getWeights().map((w, i) => (
-            tf.tidy(() => w.mul(this.config.tau).add(criticTargetWeights[i].mul(1-this.config.tau)))
+        const criticTargetWeights1 = this.criticTarget1.getWeights()
+        const criticWeights1 = this.criticMain1.getWeights().map((w, i) => (
+            tf.tidy(() => w.mul(this.config.tau).add(criticTargetWeights1[i].mul(1-this.config.tau)))
         ))
-        this.criticTarget.loadWeights(criticWeights)
+        this.criticTarget1.loadWeights(criticWeights1)
+
+        const criticTargetWeights2 = this.criticTarget2.getWeights()
+        const criticWeights2 = this.criticMain2.getWeights().map((w, i) => (
+            tf.tidy(() => w.mul(this.config.tau).add(criticTargetWeights2[i].mul(1-this.config.tau)))
+        ))
+        this.criticTarget2.loadWeights(criticWeights2)
     }
 
     private _log: string = ""
