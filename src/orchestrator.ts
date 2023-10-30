@@ -189,8 +189,7 @@ export class Orchestrator {
      * The negative normalized distance squared to the center of the scene
      */
     computeReward(drone: DroneEntity): number {
-        const boundSizeSquared = (this.config.boundDiameter/2) * (this.config.boundDiameter/2)
-        return -(drone.physics.transformNode.absolutePosition.lengthSquared() / boundSizeSquared)
+        return -drone.physics.transformNode.absolutePosition.length() / (this.config.boundDiameter/2)
     }
 
     choose(state: StateArray): number[] {
@@ -202,7 +201,7 @@ export class Orchestrator {
             return <number[]> prediction.arraySync()
         } else {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - RNG`)
-            return [Math.random(), Math.random(), Math.random(), Math.random()]
+            return [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1]
         }
     }
 
@@ -345,15 +344,15 @@ export class Orchestrator {
     }
 
     resetEpisode (failed: boolean = true) {
-        if(failed && this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
-            const punishment = -10
-            this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, punishment])
-            const state = collectState(this.drone, this.wind)
-            this.memory.add(state, null, this.currentAction, punishment, true)
-            this.rewardCounts++
-            this.avgReward = (this.avgReward * (this.rewardCounts - 1) + punishment) / this.rewardCounts
-            this.flush()
-        }
+        // if(failed && this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
+        //     const punishment = -10
+        //     this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, punishment])
+        //     const state = collectState(this.drone, this.wind)
+        //     this.memory.add(state, null, this.currentAction, punishment, true)
+        //     this.rewardCounts++
+        //     this.avgReward = (this.avgReward * (this.rewardCounts - 1) + punishment) / this.rewardCounts
+        //     this.flush()
+        // }
 
         this.currentState = null
         this.currentAction = null
