@@ -8,6 +8,7 @@ import {Scene} from "@babylonjs/core/scene";
 import {Vector3} from "@babylonjs/core/Maths/math.vector";
 import {Actor} from "./actor.ts";
 import {Critic} from "./critic.ts";
+import {HavokPlugin} from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 
 interface Configuration {
     stepInterval: number,
@@ -30,6 +31,7 @@ interface Configuration {
 
 export class Orchestrator {
     scene: Scene
+    physics: HavokPlugin
     drone: DroneEntity
     wind: Wind
     currentState: StateArray | null
@@ -46,11 +48,8 @@ export class Orchestrator {
     actorMain: Actor;
     actorTarget: Actor;
 
-    criticMain1: Critic
-    criticTarget1: Critic
-
-    criticMain2: Critic
-    criticTarget2: Critic
+    criticMain: Critic
+    criticTarget: Critic
 
     currentEpisodeDuration: number
 
@@ -60,12 +59,17 @@ export class Orchestrator {
     rewardCounts: number = 0;
 
     actorLosses: number[] = []
-    critic1Losses: number[] = []
-    critic2Losses: number[] = []
+    criticLosses: number[] = []
     avgRewards: number[] = []
 
-    constructor(scene: Scene, drone: DroneEntity, wind: Wind, config: Configuration, train = true) {
+    constructor(scene: Scene,
+                drone: DroneEntity,
+                wind: Wind,
+                physics: HavokPlugin,
+                config: Configuration,
+                train = true) {
         this.scene = scene
+        this.physics = physics
         this.drone = drone
         this.wind = wind
         this.config = config
@@ -76,13 +80,9 @@ export class Orchestrator {
         this.actorTarget = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.actorLR)
         this.actorTarget.loadWeights(this.actorMain.getWeights())
 
-        this.criticMain1 = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
-        this.criticTarget1 = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
-        this.criticTarget1.loadWeights(this.criticMain1.getWeights())
-
-        this.criticMain2 = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
-        this.criticTarget2 = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
-        this.criticTarget2.loadWeights(this.criticMain2.getWeights())
+        this.criticMain = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget.loadWeights(this.criticMain.getWeights())
 
         this.trainingStep = 0
         this.epsilon = 0
@@ -113,30 +113,21 @@ export class Orchestrator {
     }
 
     plot() {
-        const x = this.critic1Losses.map((_v, i) => i)
-        const maxCritic1 = Math.max(...this.critic1Losses)
+        const x = this.criticLosses.map((_v, i) => i)
+        const maxCritic = Math.max(...this.criticLosses)
         const trace1: Plotly.Data = {
             x,
-            y: this.critic1Losses.map(l => l / maxCritic1),
+            y: this.criticLosses.map(l => l / maxCritic),
             type: 'scatter',
-            name: "Critic 1 Loss"
+            name: "Critic Loss"
         };
-
-        const maxCritic2 = Math.max(...this.critic2Losses)
         const trace2: Plotly.Data = {
-            x,
-            y: this.critic2Losses.map(l => l / maxCritic2),
-            type: 'scatter',
-            name: "Critic 2 Loss"
-        };
-
-        const trace3: Plotly.Data = {
             x,
             y: this.actorLosses,
             type: 'scatter',
             name: "Actor Loss"
         };
-        const trace4: Plotly.Data = {
+        const trace3: Plotly.Data = {
             x,
             y: this.avgRewards,
             type: 'scatter',
@@ -144,7 +135,8 @@ export class Orchestrator {
         };
 
 
-        const data = [trace1, trace2, trace3, trace4];
+        const data = [trace1, trace2, trace3];
+        // @ts-ignore
         Plotly.newPlot('plot', data);
     }
 
@@ -169,7 +161,7 @@ export class Orchestrator {
         this._optimize = value
     }
 
-    async loadModel(actor: string, critic: string) {
+    async loadModel(_actor: string, _critic: string) {
         // const isTraining = this.shouldTrain
         // this.shouldTrain = false
         // await this.actorMain.load(actor)
@@ -189,7 +181,7 @@ export class Orchestrator {
      * The negative normalized distance squared to the center of the scene
      */
     computeReward(drone: DroneEntity): number {
-        return -drone.physics.transformNode.absolutePosition.length() / (this.config.boundDiameter/2)
+        return -drone.physics.transformNode.absolutePosition.lengthSquared()
     }
 
     choose(state: StateArray): number[] {
@@ -240,31 +232,17 @@ export class Orchestrator {
 
 
             const targetValues = tf.tidy(() => {
-                const targetActionsNoNoise = this.actorTarget.predict(nextStateBatch)
-                const noise = tf
-                    .randomNormal(targetActionsNoNoise.shape, 0, 0.2)
-                    .clipByValue(-0.5, 0.5)
-                const targetActions = targetActionsNoNoise.add(noise).clipByValue(0, 1)
-
-                const targetNextStateValues1 = this.criticTarget1.predict(nextStateBatch, targetActions)
-                const targetNextStateValues2 = this.criticTarget2.predict(nextStateBatch, targetActions)
-                const targetNextStateValues = tf.minimum(targetNextStateValues1, targetNextStateValues2)
+                const targetActions = this.actorTarget.predict(nextStateBatch)
+                const targetNextStateValues = this.criticTarget.predict(nextStateBatch, targetActions)
 
                 const discountedNextStateValues = targetNextStateValues.mul(this.config.gamma)
                 const terminalNextStateValues = discountedNextStateValues.mul(terminalBatch)
                 return terminalNextStateValues.add(rewardsBatch)
             })
 
-            const criticInfo1 = await this.criticMain1.optimize(stateBatch, actionBatch, targetValues);
-            const criticInfo2 = await this.criticMain2.optimize(stateBatch, actionBatch, targetValues);
+            const criticInfo = await this.criticMain.optimize(stateBatch, actionBatch, targetValues);
 
-            let actorInfo: number
-            if (this.trainingStep % this.config.actorUpdateInterval === 0) {
-                actorInfo = await this.actorMain.optimize(stateBatch, this.criticMain1)
-                this.updateWeights()
-            } else {
-                actorInfo = this.actorLosses[this.actorLosses.length - 1]
-            }
+            const actorInfo = await this.actorMain.optimize(stateBatch, this.criticMain)
 
 
             stateBatch.dispose()
@@ -273,17 +251,18 @@ export class Orchestrator {
             rewardsBatch.dispose()
             terminalBatch.dispose()
             targetValues.dispose()
-            this.log(`CRITIC1 LOSS = ${criticInfo1}`)
-            this.log(`CRITIC2 LOSS = ${criticInfo2}`)
+            this.log(`CRITIC LOSS = ${criticInfo}`)
             this.log(`ACTOR LOSS = ${actorInfo}`)
             this.avgRewards.push(this.avgReward)
             this.actorLosses.push(actorInfo)
-            this.critic1Losses.push(criticInfo1)
-            this.critic2Losses.push(criticInfo2)
+            this.criticLosses.push(criticInfo)
+
+            this.updateWeights()
         }
     }
 
     async loop () {
+        this.physics.setTimeStep(0)
         this.log(`------------- STEP ${this.trainingStep} ---------------`)
         const nextState = collectState(this.drone, this.wind)
         const action = this.choose(nextState)
@@ -311,6 +290,7 @@ export class Orchestrator {
 
         this.flush()
         this.interval = window.setTimeout(() => this.loop(), this.config.stepInterval)
+        this.physics.setTimeStep(1/60)
     }
 
     updateWeights () {
@@ -320,17 +300,11 @@ export class Orchestrator {
         ))
         this.actorTarget.loadWeights(actorWeights)
 
-        const criticTargetWeights1 = this.criticTarget1.getWeights()
-        const criticWeights1 = this.criticMain1.getWeights().map((w, i) => (
-            tf.tidy(() => w.mul(this.config.tau).add(criticTargetWeights1[i].mul(1-this.config.tau)))
+        const criticTargetWeights = this.criticTarget.getWeights()
+        const criticWeights = this.criticMain.getWeights().map((w, i) => (
+            tf.tidy(() => w.mul(this.config.tau).add(criticTargetWeights[i].mul(1-this.config.tau)))
         ))
-        this.criticTarget1.loadWeights(criticWeights1)
-
-        const criticTargetWeights2 = this.criticTarget2.getWeights()
-        const criticWeights2 = this.criticMain2.getWeights().map((w, i) => (
-            tf.tidy(() => w.mul(this.config.tau).add(criticTargetWeights2[i].mul(1-this.config.tau)))
-        ))
-        this.criticTarget2.loadWeights(criticWeights2)
+        this.criticTarget.loadWeights(criticWeights)
     }
 
     private _log: string = ""
@@ -344,26 +318,25 @@ export class Orchestrator {
     }
 
     resetEpisode (failed: boolean = true) {
-        // if(failed && this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
-        //     const punishment = -10
-        //     this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, punishment])
-        //     const state = collectState(this.drone, this.wind)
-        //     this.memory.add(state, null, this.currentAction, punishment, true)
-        //     this.rewardCounts++
-        //     this.avgReward = (this.avgReward * (this.rewardCounts - 1) + punishment) / this.rewardCounts
-        //     this.flush()
-        // }
+        if(failed && this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
+            const punishment = -10
+            this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, punishment])
+            // const state = collectState(this.drone, this.wind)
+            // this.memory.add(state, null, this.currentAction, punishment, true)
+            // this.rewardCounts++
+            // this.avgReward = (this.avgReward * (this.rewardCounts - 1) + punishment) / this.rewardCounts
+            this.flush()
+        }
 
         this.currentState = null
         this.currentAction = null
         this.currentEpisodeDuration = 0
 
-        // const randomLimit = this.config.boundDiameter * 0.8
-        // const scale = (Math.random() - 0.5) * 2 * randomLimit
-        // this.drone.reset(new Vector3(
-        //     Math.random(),
-        //     Math.random(),
-        //     Math.random()).scale(scale))
-        this.drone.reset(new Vector3(0,0,0))
+        const randomLimit = this.config.boundDiameter * 0.8
+        const scale = (Math.random() - 0.5) * 2 * randomLimit
+        this.drone.reset(new Vector3(
+            Math.random(),
+            Math.random(),
+            Math.random()).scale(scale))
     }
 }
