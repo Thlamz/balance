@@ -23,10 +23,8 @@ export class Critic {
     }
 
     public predict(states: tf.Tensor, actions: tf.Tensor): tf.Tensor {
-        return <tf.Tensor> tf.tidy(() => {
-            const input = tf.concat([states, actions], 1)
-            return this.network.predict(input.reshape([-1, STATE_SIZE + ACTION_SIZE]))
-        })
+        const input = tf.concat([states, actions], 1)
+        return <tf.Tensor> this.network.predict(input.reshape([-1, STATE_SIZE + ACTION_SIZE]))
     }
 
     public async optimize(states: tf.Tensor, actions: tf.Tensor, yBatch: tf.Tensor): Promise<number> {
@@ -35,7 +33,6 @@ export class Critic {
             batchSize: yBatch.shape[0],
             epochs: 1
         })).history.loss[0]
-        xBatch.dispose()
         return loss
     }
 

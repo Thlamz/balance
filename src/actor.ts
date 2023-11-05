@@ -25,22 +25,19 @@ export class Actor {
     }
 
     public predict(states: tf.Tensor): tf.Tensor {
-        return <tf.Tensor> tf.tidy(() => this.network.predict(states.reshape([-1, STATE_SIZE])))
+        return <tf.Tensor> this.network.predict(states.reshape([-1, STATE_SIZE]))
     }
 
     public async optimize(state: tf.Tensor, critic: Critic): Promise<number> {
-        const lossFunction = () => (
-            tf.tidy(() => {
-                const newPolicyActions = this.predict(state)
-                const newPolicyLoss = critic.predict(state, newPolicyActions)
-                return tf.mean(newPolicyLoss.mul(-1)).asScalar()
-            })
-        )
+        const lossFunction = () => {
+            const newPolicyActions = this.predict(state)
+            const newPolicyLoss = critic.predict(state, newPolicyActions)
+            return tf.mean(newPolicyLoss.mul(-1)).asScalar()
+        }
         const trainableVars = this.network.getWeights(true) as tf.Variable<tf.Rank>[];
         const grads = tf.variableGrads(lossFunction, trainableVars)
         this.optimizer.applyGradients(grads.grads)
         const loss = (await grads.value.data())[0]
-        tf.dispose(grads)
         return loss
     }
 

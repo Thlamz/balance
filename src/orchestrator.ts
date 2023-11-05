@@ -148,9 +148,8 @@ export class Orchestrator {
 
             // If it was training and is not anymore, saves the model
             if(this.shouldTrain) {
-                // this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
-                // this.criticMain1.save().then(() => console.log("CRITIC EXPORTED"));
-                // this.criticMain2.save().then(() => console.log("CRITIC EXPORTED"));
+                this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
+                this.criticMain.save().then(() => console.log("CRITIC EXPORTED"));
 
                 this.plot()
             }
@@ -161,12 +160,12 @@ export class Orchestrator {
         this._optimize = value
     }
 
-    async loadModel(_actor: string, _critic: string) {
-        // const isTraining = this.shouldTrain
-        // this.shouldTrain = false
-        // await this.actorMain.load(actor)
-        // await this.criticMain.load(critic)
-        // this.shouldTrain = isTraining
+    async loadModel(actor: string, critic: string) {
+        const isTraining = this.shouldTrain
+        this.shouldTrain = false
+        await this.actorMain.load(actor)
+        await this.criticMain.load(critic)
+        this.shouldTrain = isTraining
     }
 
     start() {
@@ -181,18 +180,15 @@ export class Orchestrator {
      * The negative normalized distance squared to the center of the scene
      */
     computeReward(drone: DroneEntity): number {
-        return -drone.physics.transformNode.absolutePosition.lengthSquared()
+        return -drone.physics.transformNode.absolutePosition.lengthSquared() /
+            (this.config.boundDiameter * this.config.boundDiameter / 4)
     }
 
     choose(state: StateArray): number[] {
         if (Math.random() > this.epsilon || !this.shouldTrain) {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - PREDICTED`)
-            const prediction: tf.Tensor = tf.tidy(() => {
-                return this.actorMain.predict(tf.tensor(state)).flatten()
-            })
-            const results = <number[]> prediction.arraySync()
-            prediction.dispose()
-            return results
+            const prediction: tf.Tensor = this.actorMain.predict(tf.tensor(state)).flatten()
+            return <number[]>prediction.arraySync()
         } else {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - RNG`)
             return [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1]
@@ -221,36 +217,26 @@ export class Orchestrator {
 
             const rewards =samples.map(memory => memory[3])
 
-            const [stateBatch, actionBatch, targetValues] = tf.tidy(() => {
-                const stateBatch = tf.tensor(samples.map((memory) => memory[0]))
-                const nextStateBatch = tf.tensor(<StateArray[]> samples
-                    .map((memory) => memory[1]))
-                const actionBatch = tf.tensor(samples.map(m => m[2]),
-                    [this.config.batchSize, ACTION_SIZE])
-                const rewardsBatch = tf.tensor(rewards, [this.config.batchSize, 1])
-                const terminalBatch = tf.tensor(
-                    samples.map(m => +m[4]),
-                    [this.config.batchSize, 1]
-                )
+            const stateBatch = tf.tensor(samples.map((memory) => memory[0]))
+            const nextStateBatch = tf.tensor(<StateArray[]> samples
+                .map((memory) => memory[1]))
+            const actionBatch = tf.tensor(samples.map(m => m[2]),
+                [this.config.batchSize, ACTION_SIZE])
+            const rewardsBatch = tf.tensor(rewards, [this.config.batchSize, 1])
+            const terminalBatch = tf.tensor(
+                samples.map(m => +m[4]),
+                [this.config.batchSize, 1]
+            )
 
-                const targetActions = this.actorTarget.predict(nextStateBatch)
-                const targetNextStateValues = this.criticTarget.predict(nextStateBatch, targetActions)
+            const targetActions = this.actorTarget.predict(nextStateBatch)
+            const targetNextStateValues = this.criticTarget.predict(nextStateBatch, targetActions)
 
-                const discountedNextStateValues = targetNextStateValues.mul(this.config.gamma)
-                const terminalNextStateValues = discountedNextStateValues.mul(terminalBatch)
-                const targetValues = terminalNextStateValues.add(rewardsBatch)
-                return [stateBatch, actionBatch, targetValues]
-            })
+            const discountedNextStateValues = targetNextStateValues.mul(this.config.gamma)
+            const terminalNextStateValues = discountedNextStateValues.mul(terminalBatch)
+            const targetValues = terminalNextStateValues.add(rewardsBatch)
             const criticInfo = await this.criticMain.optimize(stateBatch, actionBatch, targetValues);
-
             const actorInfo = await this.actorMain.optimize(stateBatch, this.criticMain)
 
-
-
-
-            stateBatch.dispose()
-            actionBatch.dispose()
-            targetValues.dispose()
             this.log(`CRITIC LOSS = ${criticInfo}`)
             this.log(`ACTOR LOSS = ${actorInfo}`)
             this.avgRewards.push(this.avgReward)
@@ -262,6 +248,7 @@ export class Orchestrator {
     }
 
     async loop () {
+        tf.engine().startScope()
         this.physics.setTimeStep(0)
         this.log(`------------- STEP ${this.trainingStep} ---------------`)
         const nextState = collectState(this.drone, this.wind)
@@ -291,18 +278,19 @@ export class Orchestrator {
         this.flush()
         this.interval = window.setTimeout(() => this.loop(), this.config.stepInterval)
         this.physics.setTimeStep(1/60)
+        tf.engine().endScope()
     }
 
     updateWeights () {
         const actorTargetWeights = this.actorTarget.getWeights()
         const actorWeights = this.actorMain.getWeights().map((w, i) => (
-            tf.tidy(() => w.mul(this.config.tau).add(actorTargetWeights[i].mul(1-this.config.tau)))
+            w.mul(this.config.tau).add(actorTargetWeights[i].mul(1-this.config.tau))
         ))
         this.actorTarget.loadWeights(actorWeights)
 
         const criticTargetWeights = this.criticTarget.getWeights()
         const criticWeights = this.criticMain.getWeights().map((w, i) => (
-            tf.tidy(() => w.mul(this.config.tau).add(criticTargetWeights[i].mul(1-this.config.tau)))
+            w.mul(this.config.tau).add(criticTargetWeights[i].mul(1-this.config.tau))
         ))
         this.criticTarget.loadWeights(criticWeights)
     }

@@ -25,7 +25,7 @@ export class Model {
     }
 
     public predict(states: tf.Tensor): QValues {
-        return <QValues> tf.tidy(() => this.network.predict(states.reshape([-1, STATE_SIZE])))
+        return <QValues> this.network.predict(states.reshape([-1, STATE_SIZE]))
     }
 
     public async optimize(xBatch: QValues, yBatch: QValues) {
