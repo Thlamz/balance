@@ -190,7 +190,9 @@ export class Orchestrator {
             const prediction: tf.Tensor = tf.tidy(() => {
                 return this.actorMain.predict(tf.tensor(state)).flatten()
             })
-            return <number[]> prediction.arraySync()
+            const results = <number[]> prediction.arraySync()
+            prediction.dispose()
+            return results
         } else {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - RNG`)
             return [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1]
@@ -219,37 +221,35 @@ export class Orchestrator {
 
             const rewards =samples.map(memory => memory[3])
 
-            const stateBatch = tf.tensor(samples.map((memory) => memory[0]))
-            const nextStateBatch = tf.tensor(<StateArray[]> samples
-                .map((memory) => memory[1]))
-            const actionBatch = tf.tensor(samples.map(m => m[2]),
-                [this.config.batchSize, ACTION_SIZE])
-            const rewardsBatch = tf.tensor(rewards, [this.config.batchSize, 1])
-            const terminalBatch = tf.tensor(
-                samples.map(m => +m[4]),
-                [this.config.batchSize, 1]
-            )
+            const [stateBatch, actionBatch, targetValues] = tf.tidy(() => {
+                const stateBatch = tf.tensor(samples.map((memory) => memory[0]))
+                const nextStateBatch = tf.tensor(<StateArray[]> samples
+                    .map((memory) => memory[1]))
+                const actionBatch = tf.tensor(samples.map(m => m[2]),
+                    [this.config.batchSize, ACTION_SIZE])
+                const rewardsBatch = tf.tensor(rewards, [this.config.batchSize, 1])
+                const terminalBatch = tf.tensor(
+                    samples.map(m => +m[4]),
+                    [this.config.batchSize, 1]
+                )
 
-
-            const targetValues = tf.tidy(() => {
                 const targetActions = this.actorTarget.predict(nextStateBatch)
                 const targetNextStateValues = this.criticTarget.predict(nextStateBatch, targetActions)
 
                 const discountedNextStateValues = targetNextStateValues.mul(this.config.gamma)
                 const terminalNextStateValues = discountedNextStateValues.mul(terminalBatch)
-                return terminalNextStateValues.add(rewardsBatch)
+                const targetValues = terminalNextStateValues.add(rewardsBatch)
+                return [stateBatch, actionBatch, targetValues]
             })
-
             const criticInfo = await this.criticMain.optimize(stateBatch, actionBatch, targetValues);
 
             const actorInfo = await this.actorMain.optimize(stateBatch, this.criticMain)
 
 
+
+
             stateBatch.dispose()
-            nextStateBatch.dispose()
             actionBatch.dispose()
-            rewardsBatch.dispose()
-            terminalBatch.dispose()
             targetValues.dispose()
             this.log(`CRITIC LOSS = ${criticInfo}`)
             this.log(`ACTOR LOSS = ${actorInfo}`)

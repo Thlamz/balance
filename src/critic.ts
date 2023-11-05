@@ -30,7 +30,7 @@ export class Critic {
     }
 
     public async optimize(states: tf.Tensor, actions: tf.Tensor, yBatch: tf.Tensor): Promise<number> {
-        const xBatch = tf.tidy(() => tf.concat([states, actions], 1))
+        const xBatch = tf.concat([states, actions], 1)
         const loss =  <number>(await this.network.fit(xBatch, yBatch, {
             batchSize: yBatch.shape[0],
             epochs: 1
