@@ -180,8 +180,7 @@ export class Orchestrator {
      * The negative normalized distance squared to the center of the scene
      */
     computeReward(drone: DroneEntity): number {
-        return -drone.physics.transformNode.absolutePosition.lengthSquared() /
-            (this.config.boundDiameter * this.config.boundDiameter / 4)
+        return -drone.physics.transformNode.absolutePosition.lengthSquared()
     }
 
     choose(state: StateArray): number[] {
@@ -191,7 +190,7 @@ export class Orchestrator {
             return <number[]>prediction.arraySync()
         } else {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - RNG`)
-            return [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1]
+            return new Array(ACTION_SIZE).fill(0).map(() => Math.random())
         }
     }
 

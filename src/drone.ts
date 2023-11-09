@@ -19,15 +19,18 @@ import "@babylonjs/core/Physics/joinedPhysicsEngineComponent"
 import {ExtrudePolygon} from "@babylonjs/core/Meshes/Builders/polygonBuilder"
 import {CreateCylinder} from "@babylonjs/core/Meshes/Builders/cylinderBuilder"
 import {IAnimationKey} from "@babylonjs/core";
+import {CreateSphere} from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 
 
 export default class DroneEntity {
     public mesh: Mesh
-    private axisSpeeds: number[]
+    private direction: number[]
+    private speed : number
     private propAnimations: Animatable[]
     private readonly reversedAnimations: number[]
     private readonly scene: Scene
     public readonly physics: PhysicsAggregate
+    private directionSphere: Mesh;
 
     constructor(scene: Scene) {
         this.scene = scene
@@ -136,7 +139,8 @@ export default class DroneEntity {
         prop4.position.x = Math.sqrt(0.5) / 2
         prop4.position.y = -Math.sqrt(0.5) / 2
 
-        this.axisSpeeds = [0, 0, 0]
+        this.direction = [0, 0, 0]
+        this.speed = 0
 
         this.propAnimations = []
         this.propAnimations.push(scene.beginAnimation(prop1, 0, 30, true))
@@ -167,7 +171,17 @@ export default class DroneEntity {
             this.applyForces()
         })
 
-        this.setActuation(1)
+        this.setAction([0, 0, 0, 0])
+
+        const directionSphere = CreateSphere("direction", {
+            diameter: 0.1
+        }, scene)
+        const directionSphereMaterial = new StandardMaterial("directionSphereMaterial", scene)
+        directionSphereMaterial.disableLighting = true
+        directionSphereMaterial.emissiveColor = Color3.White()
+        directionSphereMaterial.alpha = 0.5
+        directionSphere.material = directionSphereMaterial
+        this.directionSphere = directionSphere
 
         this.mesh = drone
     }
@@ -201,32 +215,19 @@ export default class DroneEntity {
         return propParticles
     }
 
-    setActuation(speed: number, axis: number | undefined = undefined) {
-        if (axis === undefined) {
-            for (let index = 0; index < this.axisSpeeds.length; index++) {
-                this.setActuation(speed, index)
-            }
-            return
-        }
-
-        this.axisSpeeds[axis] = speed
+    setAction(action: number[]) {
+        const [rx, ry, rz, speed] = action
+        this.direction = [rx, ry, rz]
+        this.speed = speed
     }
 
 
     applyForces() {
-        for (let index = 0; index < this.axisSpeeds.length; index++) {
-            let angle = [0, 0, 0]
-            angle[index] = 1
-            const angleVector = new Vector3(...angle)
-            let speed: number
-            if (index == 1) {
-                speed = this.axisSpeeds[index] * 1.2
-            } else {
-                speed = this.axisSpeeds[index] * 1.2
-            }
-            const direction = angleVector.scale(speed)
-            this.physics.body.applyForce(direction, this.mesh.absolutePosition)
-        }
+        const angleVector = new Vector3(this.direction[0], this.direction[1], this.direction[2])
+
+        const direction = angleVector.scale((this.speed * 2 - 1) * 2)
+        this.physics.body.applyForce(direction, this.mesh.absolutePosition)
+        this.directionSphere.position = this.mesh.absolutePosition.add(direction)
     }
 
     reset(position: Vector3) {
@@ -235,7 +236,7 @@ export default class DroneEntity {
         this.physics.body.setLinearVelocity(Vector3.Zero())
         this.physics.transformNode.setAbsolutePosition(position)
         this.physics.transformNode.rotation = new Vector3(-Math.PI/2, 0, 0)
-        this.setActuation(0)
+        this.setAction([0, 0, 0, 0])
         this.scene.onAfterRenderObservable.addOnce(() => {
             this.physics.body.disablePreStep = true
         })

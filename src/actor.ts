@@ -17,7 +17,7 @@ export class Actor {
                 inputShape: i === 0 ? [STATE_SIZE] : undefined
             }));
         }
-        network.add(tf.layers.dense({units: ACTION_SIZE, activation: 'tanh'}));
+        network.add(tf.layers.dense({units: ACTION_SIZE, activation: 'sigmoid'}));
 
         network.summary();
         this.network = network

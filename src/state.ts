@@ -7,11 +7,12 @@ import Wind from "./wind";
  */
 export type StateArray = number[]
 
-export const STATE_SIZE = 7
+export const STATE_SIZE = 8
 
 export function collectState(drone: DroneEntity, _wind: Wind): StateArray {
     const state: StateArray = []
-    drone.physics.transformNode.absolutePosition.toArray(state)
+    drone.physics.transformNode.absolutePosition.normalizeToNew().toArray(state)
+    state.push(drone.physics.transformNode.absolutePosition.length())
     // drone.physics.transformNode.rotation.toArray(state, state.length)
     drone.physics.body.getLinearVelocity().normalizeToNew().toArray(state, state.length)
     state.push(drone.physics.body.getLinearVelocity().length())

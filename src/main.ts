@@ -83,17 +83,17 @@ async function setupSimulation() {
     const orchestrator = new Orchestrator(scene, drone, wind, physicsPlugin, {
         stepInterval: 100,
         batchSize: 64,
-        memorySize: 40_000,
-        trainingSteps: 100_000,
+        memorySize: 12_000,
+        trainingSteps: 30_000,
         actorUpdateInterval: 2,
         gamma: 0.99,
         hiddenLayerSize: 64,
         numHiddenLayers: 2,
         boundDiameter: boundSize,
-        epsilonDecay: 20_000,
+        epsilonDecay: 6_000,
         episodeLimit: 200,
         tau: 0.005,
-        actorLR: 1e-4,
+        actorLR: 5e-6,
         criticLR: 5e-4
     }, true)
     orchestrator.start()

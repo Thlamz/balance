@@ -5,7 +5,7 @@ import DroneEntity from "./drone";
  */
 export type ActionArray = number[]
 
-export const ACTION_SIZE = 3
+export const ACTION_SIZE = 4
 export const ACTION_MAP: ActionArray[] = [
     [0.885,0.885,0.885,0.885],
     [0.94,0.885,0.885,0.885],
@@ -26,5 +26,5 @@ export const ACTION_MAP: ActionArray[] = [
 ]
 
 export function applyAction(action: ActionArray, drone: DroneEntity) {
-    action.forEach((speed, index) => drone.setActuation(speed, index))
+    drone.setAction(action)
 }
