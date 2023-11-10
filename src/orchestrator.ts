@@ -180,8 +180,7 @@ export class Orchestrator {
      * The negative normalized distance squared to the center of the scene
      */
     computeReward(drone: DroneEntity): number {
-        return -drone.physics.transformNode.absolutePosition.lengthSquared()
-            / (this.config.boundDiameter * this.config.boundDiameter / 4)
+        return -((drone.physics.transformNode.absolutePosition.length() * 2) ** 2)
     }
 
     choose(state: StateArray): number[] {

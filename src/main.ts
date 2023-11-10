@@ -53,7 +53,7 @@ async function setupSimulation() {
     const wind = new Wind(scene, [drone.physics]);
     wind.speed = 0
 
-    const boundSize = 10
+    const boundSize = 5
     // run the main render loop
     engine.runRenderLoop(() => {
         scene.render()
@@ -83,17 +83,17 @@ async function setupSimulation() {
     const orchestrator = new Orchestrator(scene, drone, wind, physicsPlugin, {
         stepInterval: 100,
         batchSize: 64,
-        memorySize: 12_000,
-        trainingSteps: 30_000,
+        memorySize: 1200,
+        trainingSteps: 3_000,
         actorUpdateInterval: 2,
-        gamma: 0.99,
+        gamma: 0.01,
         hiddenLayerSize: 64,
         numHiddenLayers: 2,
         boundDiameter: boundSize,
-        epsilonDecay: 6_000,
-        episodeLimit: 200,
+        epsilonDecay: 600,
+        episodeLimit: 100,
         tau: 0.005,
-        actorLR: 5e-6,
+        actorLR: 1e-5,
         criticLR: 5e-4
     }, true)
     orchestrator.start()
