@@ -225,9 +225,8 @@ export default class DroneEntity {
     applyForces() {
         const angleVector = new Vector3(this.direction[0], this.direction[1], this.direction[2])
 
-        const direction = angleVector.scale((this.speed * 2 - 1) * 2)
-        this.physics.body.applyForce(direction, this.mesh.absolutePosition)
-        this.directionSphere.position = this.mesh.absolutePosition.add(direction)
+        this.physics.body.applyImpulse(angleVector.scale(this.speed * 0.02), this.mesh.absolutePosition)
+        this.directionSphere.position = this.mesh.absolutePosition.add(angleVector.scale(this.speed * 1.5))
     }
 
     reset(position: Vector3) {

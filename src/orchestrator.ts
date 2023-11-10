@@ -191,7 +191,7 @@ export class Orchestrator {
             return <number[]>prediction.arraySync()
         } else {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - RNG`)
-            return new Array(ACTION_SIZE).fill(0).map(() => Math.random())
+            return new Array(ACTION_SIZE).fill(0).map(() => Math.random() * 2 - 1)
         }
     }
 
@@ -320,8 +320,8 @@ export class Orchestrator {
         this.currentAction = null
         this.currentEpisodeDuration = 0
 
-        const randomLimit = this.config.boundDiameter / 2 * 0.9
-        const scale = (Math.random() * 2 - 1) * randomLimit
+        const randomLimit = this.config.boundDiameter / 2
+        const scale = (Math.random() / 2 + 0.5 * (Math.random() > 0.5 ? 1 : -1)) * randomLimit
         this.drone.reset(new Vector3(
             Math.random(),
             Math.random(),
