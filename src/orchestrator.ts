@@ -181,6 +181,7 @@ export class Orchestrator {
      */
     computeReward(drone: DroneEntity): number {
         return -drone.physics.transformNode.absolutePosition.lengthSquared()
+            / (this.config.boundDiameter * this.config.boundDiameter / 4)
     }
 
     choose(state: StateArray): number[] {
@@ -319,8 +320,8 @@ export class Orchestrator {
         this.currentAction = null
         this.currentEpisodeDuration = 0
 
-        const randomLimit = this.config.boundDiameter * 0.8
-        const scale = (Math.random() - 0.5) * 2 * randomLimit
+        const randomLimit = this.config.boundDiameter / 2 * 0.9
+        const scale = (Math.random() * 2 - 1) * randomLimit
         this.drone.reset(new Vector3(
             Math.random(),
             Math.random(),
