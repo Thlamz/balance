@@ -50,7 +50,7 @@ export class Actor {
     }
 
     public async save() {
-        await this.network.save('downloads://trained-model');
+        await this.network.save('downloads://trained-actor-model');
     }
 
     public async load(path: string) {
