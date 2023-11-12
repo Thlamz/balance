@@ -167,10 +167,6 @@ export default class DroneEntity {
 
         this.physics = new PhysicsAggregate(drone, PhysicsShapeType.BOX, {mass: 1}, scene)
 
-        scene.onBeforePhysicsObservable.add(() => {
-            this.applyForces()
-        })
-
         this.setAction([0, 0, 0, 0])
 
         const directionSphere = CreateSphere("direction", {
@@ -218,14 +214,18 @@ export default class DroneEntity {
     setAction(action: number[]) {
         const [rx, ry, rz, speed] = action
         this.direction = [rx, ry, rz]
-        this.speed = speed
+        this.speed = (speed + 1) / 2
     }
 
 
     applyForces() {
-        const angleVector = new Vector3(this.direction[0], this.direction[1], this.direction[2])
+        const angleVector = new Vector3(this.direction[0], this.direction[1], this.direction[2]).normalizeToNew()
+        const scaledAngleVector = angleVector.scale(this.speed * 0.2)
 
-        this.physics.body.applyImpulse(angleVector.scale(this.speed * 0.02), this.mesh.absolutePosition)
+        this.physics.body.setLinearVelocity(
+            this.physics.body.getLinearVelocity().add(scaledAngleVector)
+        )
+        //this.physics.body.applyImpulse(angleVector.scale(this.speed * 0.02), this.mesh.absolutePosition)
         this.directionSphere.position = this.mesh.absolutePosition.add(angleVector.scale(this.speed * 1.5))
     }
 

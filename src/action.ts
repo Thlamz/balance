@@ -27,4 +27,5 @@ export const ACTION_MAP: ActionArray[] = [
 
 export function applyAction(action: ActionArray, drone: DroneEntity) {
     drone.setAction(action)
+    drone.applyForces()
 }

@@ -180,7 +180,10 @@ export class Orchestrator {
      * The negative normalized distance squared to the center of the scene
      */
     computeReward(drone: DroneEntity): number {
-        return -((drone.physics.transformNode.absolutePosition.length() * 2) ** 2)
+        const actionVector = new Vector3(this.currentAction![0], this.currentAction![1], this.currentAction![2]).normalize()
+        const centerVector = drone.physics.transformNode.absolutePosition.normalizeToNew().scale(-1)
+
+        return -Math.sqrt((centerVector.x - actionVector.x) ** 2 + (centerVector.y - actionVector.y) ** 2 + (centerVector.z - actionVector.z) ** 2)
     }
 
     choose(state: StateArray): number[] {
@@ -250,7 +253,7 @@ export class Orchestrator {
         tf.engine().startScope()
         this.physics.setTimeStep(0)
         this.log(`------------- STEP ${this.trainingStep} ---------------`)
-        const nextState = collectState(this.drone, this.wind)
+        const nextState = collectState(this.drone, this.config.boundDiameter/2, this.wind)
         const action = this.choose(nextState)
         this.log(action)
         applyAction(action, this.drone)
