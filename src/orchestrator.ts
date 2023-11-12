@@ -1,6 +1,5 @@
 import {collectState, StateArray} from "./state";
 import DroneEntity from "./drone";
-import Wind from "./wind";
 import * as tf from "@tensorflow/tfjs"
 import {Memory, MemoryBuffer} from "./memoryBuffer";
 import {ACTION_SIZE, applyAction} from "./action";
@@ -33,7 +32,6 @@ export class Orchestrator {
     scene: Scene
     physics: HavokPlugin
     drone: DroneEntity
-    wind: Wind
     currentState: StateArray | null
     currentAction: number[] | null
 
@@ -64,14 +62,12 @@ export class Orchestrator {
 
     constructor(scene: Scene,
                 drone: DroneEntity,
-                wind: Wind,
                 physics: HavokPlugin,
                 config: Configuration,
                 train = true) {
         this.scene = scene
         this.physics = physics
         this.drone = drone
-        this.wind = wind
         this.config = config
 
         this.memory = new MemoryBuffer(config['memorySize'])
@@ -257,7 +253,7 @@ export class Orchestrator {
         tf.engine().startScope()
         this.physics.setTimeStep(0)
         this.log(`------------- STEP ${this.trainingStep} ---------------`)
-        const nextState = collectState(this.drone, this.config.boundDiameter/2, this.wind)
+        const nextState = collectState(this.drone, this.config.boundDiameter/2)
         const action = this.choose(nextState)
         this.log(action)
         applyAction(action, this.drone)
