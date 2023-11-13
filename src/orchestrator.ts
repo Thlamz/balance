@@ -178,12 +178,17 @@ export class Orchestrator {
     computeReward(drone: DroneEntity): number {
         const centerVector = drone.physics.transformNode.absolutePosition
         const newVelocityVector = drone.physics.body.getLinearVelocity()
+        const oldVelocityVector =
+            new Vector3(this.currentState![4], this.currentState![5], this.currentState![6]).scale(this.currentState![7])
 
-        if (centerVector.length() <= 1 && newVelocityVector.length() <= 0.3) {
-            return 1
+        if (centerVector.length() <= 0.4 && newVelocityVector.length() <= 0.3) {
+            return 2
         }
 
-        return -Math.abs(1 - Vector3.Dot(newVelocityVector.normalizeToNew(), centerVector.normalizeToNew().scale(-1)))
+        const newDotProduct = Vector3.Dot(centerVector, newVelocityVector)
+        const oldDotProduct = Vector3.Dot(centerVector, oldVelocityVector)
+
+        return -(newDotProduct - oldDotProduct)
     }
 
     choose(state: StateArray): number[] {
@@ -327,6 +332,6 @@ export class Orchestrator {
         this.drone.reset(new Vector3(
             Math.random(),
             Math.random(),
-            Math.random()).scale(scale))
+            Math.random()).normalize().scale(scale))
     }
 }
