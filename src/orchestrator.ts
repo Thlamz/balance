@@ -51,8 +51,6 @@ export class Orchestrator {
 
     currentEpisodeDuration: number
 
-    currentEpisodeDuration: number
-
     trainingStep: number
 
     avgReward: number = 0
