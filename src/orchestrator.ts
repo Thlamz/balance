@@ -146,8 +146,6 @@ export class Orchestrator {
             if(this.shouldTrain) {
                 this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
                 this.criticMain.save().then(() => console.log("CRITIC EXPORTED"));
-
-                this.plot()
             }
         }
         this.trainingStep = 0
@@ -275,6 +273,7 @@ export class Orchestrator {
 
         if(this.trainingStep === this.config.trainingSteps) {
             this.shouldTrain = false
+            this.plot()
         }
 
         this.flush()

@@ -94,6 +94,15 @@ async function setupSimulation() {
         criticLR: 5e-4
     }, true)
     orchestrator.start()
+
+    document.getElementById("load")!.addEventListener("submit", (event) => {
+        event.preventDefault()
+        orchestrator.shouldTrain = false
+        const select = <HTMLSelectElement> document.getElementById("model")
+        const modelPath = `./trained_models/${select.value}/`
+
+        orchestrator.loadModel(modelPath + "trained-actor-model.json", modelPath + "trained-critic-model.json")
+    })
 }
 
 setupSimulation()
