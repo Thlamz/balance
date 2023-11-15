@@ -1,35 +1,39 @@
 import {collectState, StateArray} from "./state";
 import DroneEntity from "./drone";
-import Wind from "./wind";
 import * as tf from "@tensorflow/tfjs"
 import {Memory, MemoryBuffer} from "./memoryBuffer";
-import {Model} from "./model";
-import {ACTION_MAP, applyAction} from "./action";
+import {ACTION_SIZE, applyAction} from "./action";
 import {Scene} from "@babylonjs/core/scene";
 import {Vector3} from "@babylonjs/core/Maths/math.vector";
+import {Actor} from "./actor.ts";
+import {Critic} from "./critic.ts";
+import {HavokPlugin} from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 
 interface Configuration {
     stepInterval: number,
     trainingSteps: number
     memorySize: number
     batchSize: number,
-    targetUpdateInterval: number
+    actorUpdateInterval: number
     gamma: number
     hiddenLayerSize: number
-    numHiddenLayers: number,
+    numHiddenLayers: number
     boundDiameter: number
     epsilonDecay: number,
     episodeLimit: number
+    tau: number,
+    actorLR: number,
+    criticLR: number,
 }
 
 
 
 export class Orchestrator {
     scene: Scene
+    physics: HavokPlugin
     drone: DroneEntity
-    wind: Wind
     currentState: StateArray | null
-    currentAction: number | null
+    currentAction: number[] | null
 
     config: Configuration
 
@@ -39,23 +43,44 @@ export class Orchestrator {
 
     memory: MemoryBuffer
 
-    policy: Model
-    target: Model
+    actorMain: Actor;
+    actorTarget: Actor;
+
+    criticMain: Critic
+    criticTarget: Critic
+
+    currentEpisodeDuration: number
 
     currentEpisodeDuration: number
 
     trainingStep: number
-    constructor(scene: Scene, drone: DroneEntity, wind: Wind, config: Configuration, train = true) {
+
+    avgReward: number = 0
+    rewardCounts: number = 0;
+
+    actorLosses: number[] = []
+    criticLosses: number[] = []
+    avgRewards: number[] = []
+
+    constructor(scene: Scene,
+                drone: DroneEntity,
+                physics: HavokPlugin,
+                config: Configuration,
+                train = true) {
         this.scene = scene
+        this.physics = physics
         this.drone = drone
-        this.wind = wind
         this.config = config
 
         this.memory = new MemoryBuffer(config['memorySize'])
 
-        this.policy = new Model()
+        this.actorMain = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.actorLR)
+        this.actorTarget = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.actorLR)
+        this.actorTarget.loadWeights(this.actorMain.getWeights())
 
-        this.target = new Model()
+        this.criticMain = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget.loadWeights(this.criticMain.getWeights())
 
         this.trainingStep = 0
         this.epsilon = 0
@@ -75,7 +100,7 @@ export class Orchestrator {
 
         window.addEventListener("keypress", (event) => {
             if(event.key == "r") {
-                this.resetEpisode()
+                this.resetEpisode(false)
             }
         })
     }
@@ -83,6 +108,34 @@ export class Orchestrator {
     _optimize: boolean = false
     get shouldTrain() {
         return this._optimize
+    }
+
+    plot() {
+        const x = this.criticLosses.map((_v, i) => i)
+        const maxCritic = Math.max(...this.criticLosses)
+        const trace1: Plotly.Data = {
+            x,
+            y: this.criticLosses.map(l => l / maxCritic),
+            type: 'scatter',
+            name: "Critic Loss"
+        };
+        const trace2: Plotly.Data = {
+            x,
+            y: this.actorLosses,
+            type: 'scatter',
+            name: "Actor Loss"
+        };
+        const trace3: Plotly.Data = {
+            x,
+            y: this.avgRewards,
+            type: 'scatter',
+            name: "Avg Rewards"
+        };
+
+
+        const data = [trace1, trace2, trace3];
+        // @ts-ignore
+        Plotly.newPlot('plot', data);
     }
 
     set shouldTrain(value: boolean) {
@@ -93,7 +146,8 @@ export class Orchestrator {
 
             // If it was training and is not anymore, saves the model
             if(this.shouldTrain) {
-                this.policy.save().then(() => console.log("MODEL EXPORTED"));
+                this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
+                this.criticMain.save().then(() => console.log("CRITIC EXPORTED"));
             }
         }
         this.trainingStep = 0
@@ -102,11 +156,11 @@ export class Orchestrator {
         this._optimize = value
     }
 
-    async loadModel(path: string) {
+    async loadModel(actor: string, critic: string) {
         const isTraining = this.shouldTrain
         this.shouldTrain = false
-        await this.policy.load(path)
-        await this.target.load(path)
+        await this.actorMain.load(actor)
+        await this.criticMain.load(critic)
         this.shouldTrain = isTraining
     }
 
@@ -122,23 +176,24 @@ export class Orchestrator {
      * The negative normalized distance squared to the center of the scene
      */
     computeReward(drone: DroneEntity): number {
-        const boundSizeSquared = (this.config.boundDiameter/2) * (this.config.boundDiameter/2)
-        return -drone.physics.transformNode.absolutePosition.lengthSquared() / boundSizeSquared
+        const centerVector = drone.physics.transformNode.absolutePosition.scale(-1)
+        const newVelocityVector = drone.physics.body.getLinearVelocity()
+
+        if (centerVector.length() <= 0.4 && newVelocityVector.length() <= 0.3) {
+            return 2
+        }
+
+        return Vector3.Dot(centerVector.normalizeToNew(), newVelocityVector.normalize())
     }
 
-    choose(state: StateArray): number {
+    choose(state: StateArray): number[] {
         if (Math.random() > this.epsilon || !this.shouldTrain) {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - PREDICTED`)
-            const prediction: tf.Tensor = tf.tidy(() => {
-                const prediction = this.policy.predict(tf.tensor(state)).flatten()
-                return prediction.argMax()
-            })
-            const action = prediction.dataSync()[0]
-            prediction.dispose()
-            return action
+            const prediction: tf.Tensor = this.actorMain.predict(tf.tensor(state)).flatten()
+            return <number[]>prediction.arraySync()
         } else {
             this.log(`CHOICE (e=${this.epsilon.toFixed(3)}) - RNG`)
-            return Math.floor(Math.random() * ACTION_MAP.length)
+            return new Array(ACTION_SIZE).fill(0).map(() => Math.random() * 2 - 1)
         }
     }
 
@@ -150,57 +205,58 @@ export class Orchestrator {
         }
 
         const reward = this.computeReward(this.drone)
+
+        this.rewardCounts += 1
+        this.avgReward = (this.avgReward * (this.rewardCounts - 1) + reward) / this.rewardCounts
+        this.log(`REWARD = ${reward}`)
+        this.log(`AVG REWARD = ${this.avgReward}`)
+
         this.memory.add(this.currentState, nextState, this.currentAction, reward)
         this.log(`ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, reward])
         if (this.memory.size > this.config.batchSize) {
             this.log("OPTIMIZING")
             const samples: Memory[] = this.memory.sample(this.config.batchSize)
 
-            const stateBatch = tf.tensor(samples.map((memory) => memory[0]))
-            const guessedQs = this.policy.predict(stateBatch)
-
             const rewards =samples.map(memory => memory[3])
 
-            const nonTerminalSamples = samples.map((memory) => memory[1] !== null)
+            const stateBatch = tf.tensor(samples.map((memory) => memory[0]))
+            const nextStateBatch = tf.tensor(<StateArray[]> samples
+                .map((memory) => memory[1]))
+            const actionBatch = tf.tensor(samples.map(m => m[2]),
+                [this.config.batchSize, ACTION_SIZE])
+            const rewardsBatch = tf.tensor(rewards, [this.config.batchSize, 1])
+            const terminalBatch = tf.tensor(
+                samples.map(m => +m[4]),
+                [this.config.batchSize, 1]
+            )
 
-            const expectedQs: tf.Tensor = tf.tidy(() => {
-                // Terminal states are handled separately, so they are not considered in this calculation
-                const nextStateBatch = tf.tensor(<StateArray[]> samples.map((memory) => memory[1]).filter(s => s !== null))
-                let nextQs = this.target.predict(nextStateBatch)
-                const bestIndexes = nextQs.argMax(1)
-                const bestNextQs = nextQs.gather(bestIndexes, 1, 1)
-                const rewardedNextQs = bestNextQs.add(tf.tensor(rewards.filter((_, i) => nonTerminalSamples[i])))
-                return rewardedNextQs.mul(this.config.gamma)
-            })
-            const guessedQArray = <number[][]> guessedQs.arraySync()
-            const expectedArray = expectedQs.flatten().arraySync()
+            const targetActions = this.actorTarget.predict(nextStateBatch)
+            const targetNextStateValues = this.criticTarget.predict(nextStateBatch, targetActions)
 
-            // Handling terminal states by filling them directly with their reward
-            const expectedArrayWithFilledGaps: number[] = nonTerminalSamples.map((v, i) => v ? expectedArray.shift()! : rewards[i])
+            const discountedNextStateValues = targetNextStateValues.mul(this.config.gamma)
+            const terminalNextStateValues = discountedNextStateValues.mul(terminalBatch)
+            const targetValues = terminalNextStateValues.add(rewardsBatch)
+            const criticInfo = await this.criticMain.optimize(stateBatch, actionBatch, targetValues);
+            const actorInfo = await this.actorMain.optimize(stateBatch, this.criticMain)
 
-            for(let index = 0; index < this.config.batchSize; index++) {
-                guessedQArray[index][samples[index][2]] = expectedArrayWithFilledGaps[index]
-            }
+            this.log(`CRITIC LOSS = ${criticInfo}`)
+            this.log(`ACTOR LOSS = ${actorInfo}`)
+            this.avgRewards.push(this.avgReward)
+            this.actorLosses.push(actorInfo)
+            this.criticLosses.push(criticInfo)
 
-            const info = await this.policy.optimize(stateBatch, tf.tensor(guessedQArray));
-            stateBatch.dispose()
-            guessedQs.dispose()
-            expectedQs.dispose()
-            this.log(`LOSS = ${info.history.loss[0]}`)
-
-            if (this.trainingStep % this.config.targetUpdateInterval == 0) {
-                this.target.loadWeights(this.policy.getWeights())
-                this.log("UPDATING TARGET")
-            }
+            this.updateWeights()
         }
     }
 
     async loop () {
+        tf.engine().startScope()
+        this.physics.setTimeStep(0)
         this.log(`------------- STEP ${this.trainingStep} ---------------`)
-        const nextState = collectState(this.drone, this.wind)
+        const nextState = collectState(this.drone, this.config.boundDiameter/2)
         const action = this.choose(nextState)
-        this.log(ACTION_MAP[action])
-        applyAction(ACTION_MAP[action], this.drone)
+        this.log(action)
+        applyAction(action, this.drone)
 
         if (this.shouldTrain) {
             await this.optimize(nextState)
@@ -219,10 +275,27 @@ export class Orchestrator {
 
         if(this.trainingStep === this.config.trainingSteps) {
             this.shouldTrain = false
+            this.plot()
         }
 
         this.flush()
         this.interval = window.setTimeout(() => this.loop(), this.config.stepInterval)
+        this.physics.setTimeStep(1/60)
+        tf.engine().endScope()
+    }
+
+    updateWeights () {
+        const actorTargetWeights = this.actorTarget.getWeights()
+        const actorWeights = this.actorMain.getWeights().map((w, i) => (
+            w.mul(this.config.tau).add(actorTargetWeights[i].mul(1-this.config.tau))
+        ))
+        this.actorTarget.loadWeights(actorWeights)
+
+        const criticTargetWeights = this.criticTarget.getWeights()
+        const criticWeights = this.criticMain.getWeights().map((w, i) => (
+            w.mul(this.config.tau).add(criticTargetWeights[i].mul(1-this.config.tau))
+        ))
+        this.criticTarget.loadWeights(criticWeights)
     }
 
     private _log: string = ""
@@ -237,8 +310,12 @@ export class Orchestrator {
 
     resetEpisode (failed: boolean = true) {
         if(failed && this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
-            this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, -100])
-            this.memory.add(this.currentState, null, this.currentAction, -100)
+            const punishment = -10
+            this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, punishment])
+            // const state = collectState(this.drone, this.wind)
+            // this.memory.add(state, null, this.currentAction, punishment, true)
+            // this.rewardCounts++
+            // this.avgReward = (this.avgReward * (this.rewardCounts - 1) + punishment) / this.rewardCounts
             this.flush()
         }
 
@@ -246,11 +323,11 @@ export class Orchestrator {
         this.currentAction = null
         this.currentEpisodeDuration = 0
 
-        const randomLimit = this.config.boundDiameter * 0.8
-        const scale = (Math.random() - 0.5) * 2 * randomLimit
+        const randomLimit = this.config.boundDiameter / 2
+        const scale = (Math.random() / 2 + 0.5 * (Math.random() > 0.5 ? 1 : -1)) * randomLimit
         this.drone.reset(new Vector3(
             Math.random(),
             Math.random(),
-            Math.random()).scale(scale))
+            Math.random()).normalize().scale(scale))
     }
 }

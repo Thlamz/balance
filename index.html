@@ -3,8 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <title>balance</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
 </head>
 <body>
 <script type="module" src="./src/main.ts"></script>
+<div id="plot"></div>
+<form id="load" style="position: absolute; top:8px; right: 8px;">
+  <label for="model">
+    Model:
+  </label>
+  <select id="model">
+    <option></option>
+    <option value="untuned">Untuned</option>
+    <option value="rebel">Rebel</option>
+  </select>
+  <button>Load</button>
+</form>
 </body>
 </html>

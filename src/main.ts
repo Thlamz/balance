@@ -12,7 +12,6 @@ import {Mesh} from "@babylonjs/core/Meshes/mesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 import {Scene} from "@babylonjs/core/scene";
-import Wind from "./wind";
 import {Orchestrator} from "./orchestrator";
 
 async function setupSimulation() {
@@ -32,10 +31,10 @@ async function setupSimulation() {
 
     let scene = new Scene(engine)
 
-    const gravityVector = new Vector3(0, -9.81, 0)
+    const gravityVector = new Vector3(0, 0, 0)
 
     const physicsEngine = await HavokPhysics()
-    const physicsPlugin = new HavokPlugin(false, physicsEngine)
+    const physicsPlugin = new HavokPlugin(true, physicsEngine)
 
     scene.enablePhysics(gravityVector, physicsPlugin)
 
@@ -50,10 +49,8 @@ async function setupSimulation() {
     new HemisphericLight("light", new Vector3(0, 1, 0), scene)
 
     const drone = new DroneEntity(scene)
-    const wind = new Wind(scene, [drone.physics]);
-    wind.speed = 0
 
-    const boundSize = 10
+    const boundSize = 5
     // run the main render loop
     engine.runRenderLoop(() => {
         scene.render()
@@ -80,21 +77,32 @@ async function setupSimulation() {
 
     skybox.material = skyboxMaterial
 
-    const orchestrator = new Orchestrator(scene, drone, wind, {
-        stepInterval: 10,
-        batchSize: 128,
-        memorySize: 10_000,
-        trainingSteps: 100_000,
-        targetUpdateInterval: 500,
-        gamma: 0.99,
+    const orchestrator = new Orchestrator(scene, drone, physicsPlugin, {
+        stepInterval: 100,
+        batchSize: 64,
+        memorySize: 6_000,
+        trainingSteps: 10_000,
+        actorUpdateInterval: 2,
+        gamma: 0.9,
         hiddenLayerSize: 64,
         numHiddenLayers: 2,
         boundDiameter: boundSize,
-        epsilonDecay: 20000,
-        episodeLimit: 300
+        epsilonDecay: 2_000,
+        episodeLimit: 100,
+        tau: 0.005,
+        actorLR: 1e-5,
+        criticLR: 5e-4
     }, true)
-
     orchestrator.start()
+
+    document.getElementById("load")!.addEventListener("submit", (event) => {
+        event.preventDefault()
+        orchestrator.shouldTrain = false
+        const select = <HTMLSelectElement> document.getElementById("model")
+        const modelPath = `./trained_models/${select.value}/`
+
+        orchestrator.loadModel(modelPath + "trained-actor-model.json", modelPath + "trained-critic-model.json")
+    })
 }
 
 setupSimulation()

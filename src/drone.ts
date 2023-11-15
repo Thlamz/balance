@@ -7,7 +7,6 @@ import {PhysicsAggregate} from "@babylonjs/core/Physics/v2/physicsAggregate"
 import {PhysicsShapeType} from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin"
 import {Vector2, Vector3} from "@babylonjs/core/Maths/math.vector"
 import {Color3, Color4} from "@babylonjs/core/Maths/math.color"
-import {Plane} from "@babylonjs/core/Maths/math.plane"
 import {GPUParticleSystem} from "@babylonjs/core/Particles/gpuParticleSystem"
 import {ParticleSystem} from "@babylonjs/core/Particles/particleSystem"
 import {SphereDirectedParticleEmitter} from "@babylonjs/core/Particles/EmitterTypes/sphereParticleEmitter"
@@ -20,17 +19,18 @@ import "@babylonjs/core/Physics/joinedPhysicsEngineComponent"
 import {ExtrudePolygon} from "@babylonjs/core/Meshes/Builders/polygonBuilder"
 import {CreateCylinder} from "@babylonjs/core/Meshes/Builders/cylinderBuilder"
 import {IAnimationKey} from "@babylonjs/core";
+import {CreateSphere} from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 
 
 export default class DroneEntity {
     public mesh: Mesh
-    private props: Mesh[]
-    private propSpeeds: number[]
+    private direction: number[]
+    private speed : number
     private propAnimations: Animatable[]
-    private propParticleEmitters: (ParticleSystem | GPUParticleSystem)[]
     private readonly reversedAnimations: number[]
     private readonly scene: Scene
     public readonly physics: PhysicsAggregate
+    private directionSphere: Mesh;
 
     constructor(scene: Scene) {
         this.scene = scene
@@ -139,9 +139,8 @@ export default class DroneEntity {
         prop4.position.x = Math.sqrt(0.5) / 2
         prop4.position.y = -Math.sqrt(0.5) / 2
 
-        this.props = [prop1, prop2, prop3, prop4]
-
-        this.propSpeeds = [0, 0, 0, 0]
+        this.direction = [0, 0, 0]
+        this.speed = 0
 
         this.propAnimations = []
         this.propAnimations.push(scene.beginAnimation(prop1, 0, 30, true))
@@ -149,6 +148,10 @@ export default class DroneEntity {
         this.propAnimations.push(scene.beginAnimation(prop3, 0, 30, true))
         this.propAnimations.push(scene.beginAnimation(prop4, 0, 30, true))
         this.reversedAnimations = [1, -1, -1, 1]
+
+        for(let prop=0;prop<this.propAnimations.length;prop++) {
+            this.propAnimations[prop].speedRatio = this.reversedAnimations[prop] * 2
+        }
 
         drone.rotation.x = -Math.PI / 2
 
@@ -162,15 +165,19 @@ export default class DroneEntity {
         prop3Particles.start()
         prop4Particles.start()
 
-        this.propParticleEmitters = [prop1Particles, prop2Particles, prop3Particles, prop4Particles]
-
         this.physics = new PhysicsAggregate(drone, PhysicsShapeType.BOX, {mass: 1}, scene)
 
-        scene.onBeforePhysicsObservable.add(() => {
-            this.applyForces()
-        })
+        this.setAction([0, 0, 0, 0])
 
-        this.setPropSpeed(1)
+        const directionSphere = CreateSphere("direction", {
+            diameter: 0.1
+        }, scene)
+        const directionSphereMaterial = new StandardMaterial("directionSphereMaterial", scene)
+        directionSphereMaterial.disableLighting = true
+        directionSphereMaterial.emissiveColor = Color3.White()
+        directionSphereMaterial.alpha = 0.5
+        directionSphere.material = directionSphereMaterial
+        this.directionSphere = directionSphere
 
         this.mesh = drone
     }
@@ -191,43 +198,35 @@ export default class DroneEntity {
         propParticles.direction1 = new Vector3(0, 0, -10)
         propParticles.direction2 = new Vector3(0, 0, -10)
         propParticles.gravity = new Vector3(0, 0, 0)
+        const particleDistance = 0.04
+        const particleSpeed = 3 / 10
+        const particleLife = particleDistance / particleSpeed
+
+        propParticles.emitRate = 50
+        propParticles.minLifeTime = particleLife
+        propParticles.maxLifeTime = particleLife + 0.01
+        propParticles.minEmitPower = particleSpeed
+        propParticles.maxEmitPower = particleSpeed
+
         return propParticles
     }
 
-    setPropSpeed(speed: number, prop: number | undefined = undefined) {
-        if (prop === undefined) {
-            for (let index = 0; index < this.propSpeeds.length; index++) {
-                this.setPropSpeed(speed, index)
-            }
-            return
-        }
-
-        const particleDistance = 0.04
-        const particleSpeed = speed * 3 / 10
-        const particleLife = particleDistance / particleSpeed
-
-        const particlesPerSecond = speed * 50
-
-        this.propAnimations[prop].speedRatio = speed * this.reversedAnimations[prop] * 2
-
-        this.propParticleEmitters[prop].emitRate = particlesPerSecond
-        this.propParticleEmitters[prop].minLifeTime = particleLife
-        this.propParticleEmitters[prop].maxLifeTime = particleLife + 0.01
-        this.propParticleEmitters[prop].minEmitPower = particleSpeed
-        this.propParticleEmitters[prop].maxEmitPower = particleSpeed
-
-        this.propSpeeds[prop] = speed
+    setAction(action: number[]) {
+        const [rx, ry, rz, speed] = action
+        this.direction = [rx, ry, rz]
+        this.speed = (speed + 1) / 2
     }
 
+
     applyForces() {
-        const angle = Plane.FromPoints(this.props[0].absolutePosition,
-            this.props[1].absolutePosition,
-            this.props[2].absolutePosition).normal
-        for (let index = 0; index < this.propSpeeds.length; index++) {
-            const speed = this.propSpeeds[index] * 9.8 * 1.1 / 4
-            const direction = angle.scale(speed)
-            this.physics.body.applyForce(direction, this.props[index].absolutePosition)
-        }
+        const angleVector = new Vector3(this.direction[0], this.direction[1], this.direction[2]).normalizeToNew()
+        const scaledAngleVector = angleVector.scale(this.speed * 0.2)
+
+        this.physics.body.setLinearVelocity(
+            this.physics.body.getLinearVelocity().add(scaledAngleVector)
+        )
+        //this.physics.body.applyImpulse(angleVector.scale(this.speed * 0.02), this.mesh.absolutePosition)
+        this.directionSphere.position = this.mesh.absolutePosition.add(angleVector.scale(this.speed * 1.5))
     }
 
     reset(position: Vector3) {
@@ -236,7 +235,7 @@ export default class DroneEntity {
         this.physics.body.setLinearVelocity(Vector3.Zero())
         this.physics.transformNode.setAbsolutePosition(position)
         this.physics.transformNode.rotation = new Vector3(-Math.PI/2, 0, 0)
-        this.setPropSpeed(1)
+        this.setAction([0, 0, 0, 0])
         this.scene.onAfterRenderObservable.addOnce(() => {
             this.physics.body.disablePreStep = true
         })
