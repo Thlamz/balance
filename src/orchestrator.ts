@@ -136,17 +136,16 @@ export class Orchestrator {
         Plotly.newPlot('plot', data);
     }
 
+    saveModel() {
+        this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
+        this.criticMain.save().then(() => console.log("CRITIC EXPORTED"));
+    }
+
     set shouldTrain(value: boolean) {
         if(value) {
             this.epsilon = 1
         } else {
             this.epsilon = 0
-
-            // If it was training and is not anymore, saves the model
-            if(this.shouldTrain) {
-                this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
-                this.criticMain.save().then(() => console.log("CRITIC EXPORTED"));
-            }
         }
         this.trainingStep = 0
         this.currentEpisodeDuration = 0
@@ -274,6 +273,7 @@ export class Orchestrator {
         if(this.trainingStep === this.config.trainingSteps) {
             this.shouldTrain = false
             this.plot()
+            this.saveModel()
         }
 
         this.flush()
