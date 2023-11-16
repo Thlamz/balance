@@ -4,20 +4,24 @@
   <meta charset="UTF-8">
   <title>balance</title>
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
 <script type="module" src="./src/main.ts"></script>
 <div id="plot"></div>
-<form id="load" style="position: absolute; top:8px; right: 8px;">
-  <label for="model">
-    Model:
+<form id="load" style="position: absolute; top:8px; right: 8px; display: flex; flex-direction: column; background-color: rgba(255, 255, 255, 0.7); padding: 8px;">
+  <label for="model" style="margin-bottom: 8px">
+    Model
   </label>
-  <select id="model">
-    <option></option>
-    <option value="untuned">Untuned</option>
-    <option value="rebel">Rebel</option>
-  </select>
-  <button>Load</button>
+  <div>
+    <select id="model">
+      <option></option>
+      <option value="untuned">Untuned</option>
+      <option value="rebel">Rebel</option>
+    </select>
+    <button>Load</button>
+  </div>
 </form>
+<button id="reset" style="position: absolute; top: 8px; left: 8px;">Reset Position</button>
 </body>
 </html>

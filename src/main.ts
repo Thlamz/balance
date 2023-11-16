@@ -1,6 +1,8 @@
 import DroneEntity from "./drone"
 import HavokPhysics from "@babylonjs/havok"
+
 import "./style.css"
+
 import { Engine } from "@babylonjs/core/Engines/engine"
 import {HemisphericLight} from "@babylonjs/core/Lights/hemisphericLight";
 import {ArcRotateCamera} from "@babylonjs/core/Cameras/arcRotateCamera";
@@ -102,6 +104,10 @@ async function setupSimulation() {
         const modelPath = `./trained_models/${select.value}/`
 
         orchestrator.loadModel(modelPath + "trained-actor-model.json", modelPath + "trained-critic-model.json")
+    })
+
+    document.getElementById("reset")!.addEventListener("click", () => {
+      orchestrator.resetEpisode(false)
     })
 }
 
