@@ -20,6 +20,6 @@
     "@tensorflow/tfjs": "^4.10.0",
     "buffer": "^6.0.3",
     "earcut": "^2.2.4",
-    "plotly.js": "^2.27.0"
+    "plotly.js-dist": "^2.27.1"
   }
 }
