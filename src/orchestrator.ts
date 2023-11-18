@@ -41,6 +41,9 @@ export class Orchestrator {
 
     epsilon: number
 
+    trainingInfoUI: HTMLPreElement
+    plotUI: any
+
     memory: MemoryBuffer
 
     actorMain: Actor;
@@ -101,6 +104,8 @@ export class Orchestrator {
                 this.resetEpisode(false)
             }
         })
+
+        this.trainingInfoUI = <HTMLPreElement> document.getElementById("training-info")
     }
 
     _optimize: boolean = false
@@ -136,6 +141,26 @@ export class Orchestrator {
         Plotly.newPlot('plot', data);
     }
 
+    updateTrainingInfo() {
+        let trainingInfoText: string = ""
+
+        trainingInfoText += `Is training? ${this.shouldTrain}\n`
+
+        if (this.shouldTrain) {
+            trainingInfoText += `Training step: ${this.trainingStep}\n`
+            trainingInfoText += `Epsilon: ${this.epsilon.toFixed(3)}\n`
+            trainingInfoText += `Memory size: ${this.memory.size}\n`
+            trainingInfoText += `Avg reward: ${this.avgReward.toFixed(3)}\n`
+
+            trainingInfoText += `Actor loss: ${this.actorLosses[this.actorLosses.length - 1]?.toFixed(3)}\n`
+            trainingInfoText += `Critic loss: ${this.criticLosses[this.criticLosses.length - 1]?.toFixed(3)}\n`
+        }
+
+        trainingInfoText += `Episode duration: ${this.currentEpisodeDuration}\n`
+
+        this.trainingInfoUI.innerText = trainingInfoText
+    }
+
     saveModel() {
         this.actorMain.save().then(() => console.log("ACTOR EXPORTED"));
         this.criticMain.save().then(() => console.log("CRITIC EXPORTED"));
@@ -144,6 +169,10 @@ export class Orchestrator {
     set shouldTrain(value: boolean) {
         if(value) {
             this.epsilon = 1
+            this.avgRewards = []
+            this.actorLosses = []
+            this.criticLosses = []
+            this.avgReward = 0
         } else {
             this.epsilon = 0
         }
@@ -205,6 +234,7 @@ export class Orchestrator {
 
         this.rewardCounts += 1
         this.avgReward = (this.avgReward * (this.rewardCounts - 1) + reward) / this.rewardCounts
+        this.avgRewards.push(this.avgReward)
         this.log(`REWARD = ${reward}`)
         this.log(`AVG REWARD = ${this.avgReward}`)
 
@@ -238,7 +268,6 @@ export class Orchestrator {
 
             this.log(`CRITIC LOSS = ${criticInfo}`)
             this.log(`ACTOR LOSS = ${actorInfo}`)
-            this.avgRewards.push(this.avgReward)
             this.actorLosses.push(actorInfo)
             this.criticLosses.push(criticInfo)
 
@@ -272,9 +301,14 @@ export class Orchestrator {
 
         if(this.trainingStep === this.config.trainingSteps) {
             this.shouldTrain = false
-            this.plot()
             this.saveModel()
         }
+
+        if (this.shouldTrain && this.trainingStep % 10 == 0) {
+            this.plot()
+        }
+
+        this.updateTrainingInfo()
 
         this.flush()
         this.interval = window.setTimeout(() => this.loop(), this.config.stepInterval)
