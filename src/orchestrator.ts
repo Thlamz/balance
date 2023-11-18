@@ -237,14 +237,19 @@ export class Orchestrator {
      * The negative normalized distance squared to the center of the scene
      */
     computeReward(drone: DroneEntity): number {
-        const centerVector = drone.physics.transformNode.absolutePosition.scale(-1)
+        const centerVector = drone.physics.transformNode.absolutePosition
         const newVelocityVector = drone.physics.body.getLinearVelocity()
+        const oldVelocityVector =
+            new Vector3(this.currentState![4], this.currentState![5], this.currentState![6]).scale(this.currentState![7])
 
         if (centerVector.length() <= 0.4 && newVelocityVector.length() <= 0.3) {
             return 2
         }
 
-        return Vector3.Dot(centerVector.normalizeToNew(), newVelocityVector.normalize())
+        const newDotProduct = Vector3.Dot(centerVector, newVelocityVector)
+        const oldDotProduct = Vector3.Dot(centerVector, oldVelocityVector)
+
+        return -(newDotProduct - oldDotProduct)
     }
 
     choose(state: StateArray): number[] {
