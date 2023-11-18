@@ -24,9 +24,90 @@
 </form>
 <details style="position: absolute;bottom: 8px;right: 8px;">
     <summary>Training info</summary>
-    <div style="width: 40vw;">
-        <pre id="training-info" style="font-family: monospace">
-        </pre>
+    <div style="max-width: 90vw; min-width: 50vw; max-height: 70vh; overflow: auto">
+        <div style="display: flex; flex-direction: row; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <pre id="training-info" style="font-family: monospace">
+            </pre>
+            <form id="train"
+                  style="display: flex; flex-direction: column; flex-wrap: wrap; max-height: 300px; flex: 1 1 auto;overflow: auto">
+                <label>
+                    Step Interval:
+                    <input type="number" name="stepInterval" value="100" min="1" pattern="\d+" required>
+                </label>
+
+                <label>
+                    Batch Size:
+                    <input type="number" name="batchSize" value="64" min="1" step="1" pattern="\d+" required>
+                </label>
+
+                <label>
+                    Memory Size:
+                    <input type="number" name="memorySize" value="6000" min="1" step="1" pattern="\d+" required>
+                </label>
+
+                <label>
+                    Training Steps:
+                    <input type="number" name="trainingSteps" value="10000" min="1" step="1" pattern="\d+" required>
+                </label>
+
+                <label>
+                    Actor Update Interval:
+                    <input type="number" name="actorUpdateInterval" value="2" min="1" step="1" pattern="\d+" required>
+                </label>
+
+                <label>
+                    Gamma:
+                    <input type="number" name="gamma" step="0.1" value="0.9" min="0" step="0.001" required>
+                </label>
+
+                <label>
+                    Hidden Layer Size:
+                    <input type="number" name="hiddenLayerSize" value="64" min="1" step="1" pattern="\d+" required>
+                </label>
+
+                <label>
+                    Number of Hidden Layers:
+                    <input type="number" name="numHiddenLayers" value="2" min="1" step="1" pattern="\d+" required>
+                </label>
+
+                <label>
+                    Epsilon Decay:
+                    <input type="number" name="epsilonDecay" value="2000" min="0" required>
+                </label>
+
+                <label>
+                    Episode Limit:
+                    <input type="number" name="episodeLimit" value="100" min="1" step="1" pattern="\d+" required>
+                </label>
+
+                <label>
+                    Tau:
+                    <input type="number" name="tau" step="0.001" value="0.005" min="0" required>
+                </label>
+
+                <label>
+                    Actor Learning Rate:
+                    <input type="number" name="actorLR" step="1e-8" value="1e-6" min="0" required>
+                </label>
+
+                <label>
+                    Critic Learning Rate:
+                    <input type="number" name="criticLR" step="1e-6" value="5e-4" min="0" required>
+                </label>
+
+                <div  style="margin: 4px;margin-top: auto;text-align: right">
+                    <button type="submit">
+                        Train
+                    </button>
+                    <button type="reset">
+                        Reset
+                    </button>
+                </div>
+            </form>
+
+
+
+        </div>
         <div id="plot"></div>
     </div>
 </details>

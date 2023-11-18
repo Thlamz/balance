@@ -88,13 +88,12 @@ async function setupSimulation() {
         gamma: 0.9,
         hiddenLayerSize: 64,
         numHiddenLayers: 2,
-        boundDiameter: boundSize,
         epsilonDecay: 2_000,
         episodeLimit: 100,
         tau: 0.005,
         actorLR: 1e-6,
         criticLR: 5e-4
-    }, true)
+    }, boundSize,true)
     orchestrator.start()
 
     document.getElementById("load")!.addEventListener("submit", (event) => {
@@ -107,6 +106,23 @@ async function setupSimulation() {
     })
 
     document.getElementById("load")!.addEventListener("reset", (_event) => {
+        orchestrator.shouldTrain = true
+    })
+
+    document.getElementById("train")!.addEventListener("submit", (event) => {
+        event.preventDefault()
+        const data = <Record<string, string>> Object.fromEntries(new FormData(event.target as HTMLFormElement));
+
+        let parsedData: Record<string, number> = {}
+        for (const [key, value] of Object.entries(data)) {
+            // parses key to int if possilbe, else to float
+            parsedData[key] = Number.isInteger(parseFloat(value)) ? parseInt(value) : parseFloat(value)
+        }
+
+        orchestrator.config = {
+            ...orchestrator.config,
+            ...parsedData
+        }
         orchestrator.shouldTrain = true
     })
 }

@@ -9,7 +9,7 @@ import {Actor} from "./actor.ts";
 import {Critic} from "./critic.ts";
 import {HavokPlugin} from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 
-interface Configuration {
+export interface Configuration {
     stepInterval: number,
     trainingSteps: number
     memorySize: number
@@ -18,7 +18,6 @@ interface Configuration {
     gamma: number
     hiddenLayerSize: number
     numHiddenLayers: number
-    boundDiameter: number
     epsilonDecay: number,
     episodeLimit: number
     tau: number,
@@ -36,6 +35,8 @@ export class Orchestrator {
     currentAction: number[] | null
 
     config: Configuration
+
+    boundDiameter: number
 
     interval: number | undefined
 
@@ -65,11 +66,13 @@ export class Orchestrator {
                 drone: DroneEntity,
                 physics: HavokPlugin,
                 config: Configuration,
+                boundDiameter: number,
                 train = true) {
         this.scene = scene
         this.physics = physics
         this.drone = drone
         this.config = config
+        this.boundDiameter = boundDiameter
 
         this.memory = new MemoryBuffer(config['memorySize'])
 
@@ -81,7 +84,7 @@ export class Orchestrator {
         this.currentEpisodeDuration = 0
 
         scene.onBeforePhysicsObservable.add(async () => {
-            if(drone.mesh.absolutePosition.lengthSquared() > (config.boundDiameter/2) * (config.boundDiameter/2)) {
+            if(drone.mesh.absolutePosition.lengthSquared() > (boundDiameter/2) * (boundDiameter/2)) {
                 this.resetEpisode()
             }
         })
@@ -161,6 +164,15 @@ export class Orchestrator {
             },
             xaxis: {
                 gridcolor: "rgba(0,0,0,0.1)"
+            },
+            legend: {
+                orientation: "h",
+                xanchor: "center"
+            },
+            margin: {
+                pad: 4,
+                t: 10,
+                b: 10
             }
         }
 
@@ -302,7 +314,7 @@ export class Orchestrator {
         tf.engine().startScope()
         this.physics.setTimeStep(0)
         this.log(`------------- STEP ${this.trainingStep} ---------------`)
-        const nextState = collectState(this.drone, this.config.boundDiameter/2)
+        const nextState = collectState(this.drone, this.boundDiameter/2)
         const action = this.choose(nextState)
         this.log(action)
         applyAction(action, this.drone)
@@ -368,7 +380,7 @@ export class Orchestrator {
         this.currentAction = null
         this.currentEpisodeDuration = 0
 
-        const randomLimit = this.config.boundDiameter / 2
+        const randomLimit = this.boundDiameter / 2
         const scale = (Math.random() / 2 + 0.5 * (Math.random() > 0.5 ? 1 : -1)) * randomLimit
         this.drone.reset(new Vector3(
             Math.random(),
