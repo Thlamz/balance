@@ -120,7 +120,7 @@ export class Orchestrator {
             x,
             y: this.criticLosses.map(l => l / maxCritic),
             type: 'scatter',
-            name: "Critic Loss"
+            name: "Critic Loss",
         };
         const trace2: Plotly.Data = {
             x,
@@ -135,10 +135,24 @@ export class Orchestrator {
             name: "Avg Rewards"
         };
 
+        const layout: Partial<Plotly.Layout> = {
+            paper_bgcolor:"transparent",
+            plot_bgcolor: "transparent",
+            yaxis: {
+                gridcolor: "rgba(0,0,0,0.1)"
+            },
+            xaxis: {
+                gridcolor: "rgba(0,0,0,0.1)"
+            }
+        }
+
+        const config: Partial<Plotly.Config> = {
+            responsive: true
+        }
 
         const data = [trace1, trace2, trace3];
         // @ts-ignore
-        Plotly.newPlot('plot', data);
+        Plotly.newPlot('plot', data, layout, config);
     }
 
     updateTrainingInfo() {
@@ -304,7 +318,7 @@ export class Orchestrator {
             this.saveModel()
         }
 
-        if (this.shouldTrain && this.trainingStep % 10 == 0) {
+        if (this.shouldTrain) {
             this.plot()
         }
 
