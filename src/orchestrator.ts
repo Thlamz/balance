@@ -39,22 +39,20 @@ export class Orchestrator {
 
     interval: number | undefined
 
-    epsilon: number
+    epsilon: number = 0
 
     trainingInfoUI: HTMLPreElement
-    plotUI: any
 
     memory: MemoryBuffer
 
-    actorMain: Actor;
-    actorTarget: Actor;
-
-    criticMain: Critic
-    criticTarget: Critic
+    actorMain!: Actor;
+    actorTarget!: Actor;
+    criticMain!: Critic
+    criticTarget!: Critic
 
     currentEpisodeDuration: number
 
-    trainingStep: number
+    trainingStep: number = 0
 
     avgReward: number = 0
     rewardCounts: number = 0;
@@ -75,17 +73,6 @@ export class Orchestrator {
 
         this.memory = new MemoryBuffer(config['memorySize'])
 
-        this.actorMain = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.actorLR)
-        this.actorTarget = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.actorLR)
-        this.actorTarget.loadWeights(this.actorMain.getWeights())
-
-        this.criticMain = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
-        this.criticTarget = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
-        this.criticTarget.loadWeights(this.criticMain.getWeights())
-
-        this.trainingStep = 0
-        this.epsilon = 0
-
         this.shouldTrain = train
 
         this.currentState = null
@@ -101,11 +88,42 @@ export class Orchestrator {
 
         window.addEventListener("keypress", (event) => {
             if(event.key == "r") {
-                this.resetEpisode(false)
+                this.resetEpisode()
             }
         })
 
+        document.getElementById("reset")!.addEventListener("click", () => {
+            this.resetEpisode()
+        })
+
         this.trainingInfoUI = <HTMLPreElement> document.getElementById("training-info")
+    }
+
+    resetTraining() {
+        this.actorMain?.dispose()
+        this.actorTarget?.dispose()
+        this.criticMain?.dispose()
+        this.criticTarget?.dispose()
+
+        this.actorMain = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.actorLR)
+        this.actorTarget = new Actor(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.actorLR)
+        this.actorTarget.loadWeights(this.actorMain.getWeights())
+
+        this.criticMain = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget = new Critic(this.config.numHiddenLayers, this.config.hiddenLayerSize, this.config.criticLR)
+        this.criticTarget.loadWeights(this.criticMain.getWeights())
+
+        this.epsilon = 1
+        this.avgRewards = []
+        this.actorLosses = []
+        this.criticLosses = []
+        this.avgReward = 0
+
+        this.trainingStep = 0
+        this.currentEpisodeDuration = 0
+        this.memory.clear()
+
+        this.resetEpisode()
     }
 
     _optimize: boolean = false
@@ -181,19 +199,10 @@ export class Orchestrator {
     }
 
     set shouldTrain(value: boolean) {
-        if(value) {
-            this.epsilon = 1
-            this.avgRewards = []
-            this.actorLosses = []
-            this.criticLosses = []
-            this.avgReward = 0
-        } else {
-            this.epsilon = 0
-        }
-        this.trainingStep = 0
-        this.currentEpisodeDuration = 0
-        this.memory.clear()
         this._optimize = value
+        if (value) {
+            this.resetTraining()
+        }
     }
 
     async loadModel(actor: string, critic: string) {
@@ -310,7 +319,7 @@ export class Orchestrator {
         this.currentEpisodeDuration++
 
         if(this.currentEpisodeDuration >= this.config.episodeLimit) {
-            this.resetEpisode(false)
+            this.resetEpisode()
         }
 
         if(this.trainingStep === this.config.trainingSteps) {
@@ -354,17 +363,7 @@ export class Orchestrator {
         this._log = ""
     }
 
-    resetEpisode (failed: boolean = true) {
-        if(failed && this.shouldTrain && this.currentState !== null && this.currentAction !== null) {
-            const punishment = -10
-            this.log(`FAILURE - ADDED TO MEMORY (${this.memory.size}): ` + [this.currentAction, punishment])
-            // const state = collectState(this.drone, this.wind)
-            // this.memory.add(state, null, this.currentAction, punishment, true)
-            // this.rewardCounts++
-            // this.avgReward = (this.avgReward * (this.rewardCounts - 1) + punishment) / this.rewardCounts
-            this.flush()
-        }
-
+    resetEpisode () {
         this.currentState = null
         this.currentAction = null
         this.currentEpisodeDuration = 0

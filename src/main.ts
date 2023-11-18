@@ -92,7 +92,7 @@ async function setupSimulation() {
         epsilonDecay: 2_000,
         episodeLimit: 100,
         tau: 0.005,
-        actorLR: 1e-5,
+        actorLR: 1e-6,
         criticLR: 5e-4
     }, true)
     orchestrator.start()
@@ -106,8 +106,8 @@ async function setupSimulation() {
         orchestrator.loadModel(modelPath + "trained-actor-model.json", modelPath + "trained-critic-model.json")
     })
 
-    document.getElementById("reset")!.addEventListener("click", () => {
-      orchestrator.resetEpisode(false)
+    document.getElementById("load")!.addEventListener("reset", (_event) => {
+        orchestrator.shouldTrain = true
     })
 }
 

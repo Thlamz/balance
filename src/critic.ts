@@ -51,4 +51,8 @@ export class Critic {
     public async load(path: string) {
         this.network = <Sequential> await tf.loadLayersModel(path)
     }
+
+    public dispose() {
+        this.network.dispose()
+    }
 }
