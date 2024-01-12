@@ -102,7 +102,7 @@ async function setupSimulation() {
         const select = <HTMLSelectElement> document.getElementById("model")
         const modelPath = `./trained_models/${select.value}/`
 
-        orchestrator.loadModel(modelPath + "trained-actor-model.json", modelPath + "trained-critic-model.json")
+        orchestrator.loadModel(modelPath + "trained-actor-model.json")
     })
 
     document.getElementById("load")!.addEventListener("reset", (_event) => {

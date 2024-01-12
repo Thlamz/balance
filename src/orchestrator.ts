@@ -217,11 +217,10 @@ export class Orchestrator {
         }
     }
 
-    async loadModel(actor: string, critic: string) {
+    async loadModel(actor: string) {
         const isTraining = this.shouldTrain
         this.shouldTrain = false
         await this.actorMain.load(actor)
-        await this.criticMain.load(critic)
         this.shouldTrain = isTraining
     }
 
